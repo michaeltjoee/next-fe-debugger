@@ -12,8 +12,8 @@ chrome.runtime.onMessage.addListener(
     chrome.action.setTitle({
       tabId,
       title: msg.found
-        ? `next-fe debugger: __NEXT_DATA__ found (${msg.page ?? "?"})`
-        : "next-fe debugger: no __NEXT_DATA__ on this page",
+        ? `TIX-FE-DEBUGGER: __NEXT_DATA__ found (${msg.page ?? "?"})`
+        : "TIX-FE-DEBUGGER: no __NEXT_DATA__ on this page",
     });
   },
 );

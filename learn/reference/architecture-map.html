@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>next-fe debugger Architecture</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body class="ref">
+<main>
+  <nav class="crumbs"><a href="../lessons/0001-the-manifest-is-the-entrypoint.html">Lesson 1: the manifest is the entrypoint</a></nav>
+  <p class="kicker">Reference · next-fe debugger</p>
+  <h1>How it works: architecture map</h1>
+  <p class="lede">Entrypoints, worlds, the one data pipeline, and the mechanism behind every feature. Paths are relative to the repo root.</p>
+
+  <figure data-extension-map>
+    <figcaption>Blue: extension side. Orange: inside the page's tab. Arrows: the only crossings.</figcaption>
+  </figure>
+
+  <h2>Entrypoints (declared in <code>manifest.json</code>)</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Manifest key</th><th>Source</th><th>Starts when</th><th>Can see</th><th>Can't see</th></tr></thead>
+    <tbody>
+      <tr><td><code>background.service_worker</code></td><td><code>src/background.ts</code></td><td>An event it listens for fires</td><td>All <code>chrome.*</code> APIs</td><td>DOM, any page</td></tr>
+      <tr><td><code>content_scripts[0]</code></td><td><code>src/content.ts</code></td><td>Every page, <code>document_idle</code></td><td>Page DOM; <code>runtime.sendMessage</code></td><td>Page JS variables; most <code>chrome.*</code></td></tr>
+      <tr><td><code>content_scripts[1]</code> <code>world: MAIN</code></td><td><code>src/gateway-hook.ts</code></td><td>Every page, <code>document_start</code></td><td>Everything the page's own JS sees</td><td>All <code>chrome.*</code></td></tr>
+      <tr><td><code>action.default_popup</code></td><td><code>src/popup/popup.ts</code></td><td>Toolbar click or shortcut</td><td><code>chrome.*</code>, its own DOM</td><td>The page (must inject)</td></tr>
+      <tr><td><code>devtools_page</code></td><td><code>src/devtools/devtools.ts</code> → <code>panel.ts</code></td><td>DevTools opens</td><td><code>chrome.devtools.*</code>, its own DOM</td><td>The page (must eval)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>The one pipeline every tab goes through</h2>
+<pre><code>page (MAIN world)                         extension page (popup or panel)
+───────────────────                       ──────────────────────────────────────────────
+readNextData()  ── runs in page ──►  NextDataResult (plain JSON)
+  src/shared/read-next-data.ts            │
+  serialized with .toString()             ▼
+                                     renderBody(out, result, activeTab, {filter, raw})
+  panel: inspectedWindow.eval(             src/shared/inspector.ts
+    `(${readNextData.toString()})()`)      ├─ version   → renderVersion
+  popup: scripting.executeScript({         ├─ gateway   → renderGateway    ┐
+    func: readNextData, world: "MAIN"})    ├─ page      → renderPageData   ├→ renderTree (json-tree.ts)
+                                           └─ datalayer → renderDataLayer  ┘</code></pre>
+  <p>
+    <strong>Rule:</strong> <code>readNextData</code>, <code>gatewayStamp</code>, <code>dataLayerStamp</code> and <code>clearDataLayer</code> are sent to the page as source text, so they can't use imports or anything outside their own body. Their result must be JSON (hence the <code>JSON.parse(JSON.stringify(…))</code> round trips).
+  </p>
+
+  <h2>Features, one card each</h2>
+  <div class="cards">
+
+    <div class="card">
+      <h3>Toolbar icon (badge)</h3>
+      <ol>
+        <li><code>content.ts</code> looks for <code>&lt;script id="__NEXT_DATA__"&gt;</code> (DOM, so visible from the isolated world).</li>
+        <li><code>runtime.sendMessage({type: "next-data-detected", found, page})</code>.</li>
+        <li><code>background.ts</code> <code>onMessage</code> → <code>action.setIcon</code> / <code>setTitle</code> with the sender's <code>tabId</code>.</li>
+      </ol>
+      <div class="files">content.ts:4-14 · background.ts:7-19</div>
+    </div>
+
+    <div class="card">
+      <h3>Keyboard shortcuts</h3>
+      <ol>
+        <li><code>manifest.commands</code>: <code>open-version|gateway|page|datalayer</code> → <kbd>Alt</kbd><kbd>Shift</kbd> D/F/G/H.</li>
+        <li><code>background.ts</code> <code>onCommand</code>: <code>setPopup(popup.html?tab=&lt;id&gt;)</code> → <code>openPopup()</code> → <code>finally</code> reset.</li>
+        <li><code>popup.ts</code> reads <code>?tab</code> for its first tab.</li>
+        <li>Popup already open? <code>openPopup</code> throws; the popup's own <code>onCommand</code> listener calls <code>selectTab</code>.</li>
+      </ol>
+      <div class="files">manifest.json commands · background.ts:24-36 · popup.ts:19-35</div>
+    </div>
+
+    <div class="card">
+      <h3>Version tab</h3>
+      <ol>
+        <li>In the page: collect every <code>script[src]</code>, <code>link[href]</code> and <code>performance</code> resource URL.</li>
+        <li>Regex <code>&lt;origin&gt;/&lt;service&gt;/&lt;vX.Y.Z&gt;/_next/</code> groups them into <code>AssetBundle</code>s; <code>…/shared-components/…</code> go to <code>shared</code>.</li>
+        <li><code>primaryBundle</code>: the bundle matching <code>__NEXT_DATA__.assetPrefix</code>, else the one with most files.</li>
+        <li><code>renderVersion</code>: headline (click to copy), counts, collapsed file groups.</li>
+      </ol>
+      <div class="files">read-next-data.ts:77-97 · inspector.ts:47-51, 112-210</div>
+    </div>
+
+    <div class="card">
+      <h3>API Fetch tab: recording</h3>
+      <ol>
+        <li><code>gateway-hook.ts</code> runs in MAIN at <code>document_start</code>, before page scripts.</li>
+        <li>Replaces <code>window.fetch</code> and <code>XMLHttpRequest.prototype.open/setRequestHeader/send</code> with wrappers that call the originals.</li>
+        <li>Only URLs containing <code>/ms-gateway/</code> (minus <code>IGNORED_PATHS</code>) are logged: request on start, status/headers/body (cloned) on finish.</li>
+        <li>Log = non-enumerable <code>window.__MS_GATEWAY__ {session, version, calls}</code>; max 300 calls, bodies &gt; 1 MB summarised; <code>version++</code> on every change.</li>
+      </ol>
+      <div class="files">gateway-hook.ts · global.d.ts:33-63</div>
+    </div>
+
+    <div class="card">
+      <h3>API Fetch tab: reading</h3>
+      <ol>
+        <li><code>readGateway</code> copies the hook's calls.</li>
+        <li>Adds <code>performance</code> resource entries (<code>fetch</code>/<code>xmlhttprequest</code>, <code>/ms-gateway/</code>) the hook didn't record, as <code>unrecorded</code> (no method or bodies).</li>
+        <li>Counts ignored paths instead of listing them; sorts by <code>startedAt</code>.</li>
+        <li><code>renderGateway</code>: one row per call, filter on URL then bodies/headers, rows reused across re-renders so open rows stay open.</li>
+      </ol>
+      <div class="files">read-next-data.ts:157-204 · inspector.ts:330-560</div>
+    </div>
+
+    <div class="card">
+      <h3>Page Data tab</h3>
+      <ol>
+        <li><code>window.__NEXT_DATA__</code>, else parse the script tag (<code>source</code> says which).</li>
+        <li><code>window.__CORE_DATA__</code> via JSON round trip (error kept if it can't serialize).</li>
+        <li>App Router detection: no data and <code>self.__next_f</code> is an array.</li>
+        <li><code>renderPageData</code>: one folding section per global, pinned head, tree with <code>rootPath</code> so key clicks copy <code>__NEXT_DATA__.props…</code>.</li>
+      </ol>
+      <div class="files">read-next-data.ts:57-110 · inspector.ts:222-328</div>
+    </div>
+
+    <div class="card">
+      <h3>dataLayer tab</h3>
+      <ol>
+        <li><code>readDataLayer</code> slices <code>window.dataLayer</code> from <code>__clearedAt</code>.</li>
+        <li><code>toJson</code> replacer: DOM nodes → <code>[button#push]</code>, functions/cycles labelled, gtag's <code>arguments</code> → array.</li>
+        <li><code>describePush</code> + <code>eventOf</code> group by event; <code>gtag("event", x)</code> joins <code>{event: x}</code>; <code>gtm.*</code> drawn lighter.</li>
+        <li>New pushes since the last render get the <code>fresh</code> class (yellow fade).</li>
+        <li><strong>Clear</strong> = <code>clearDataLayer</code> sets a non-enumerable <code>__clearedAt = length</code> on the page's array; entries untouched.</li>
+      </ol>
+      <div class="files">read-next-data.ts:112-152, 226-230 · inspector.ts:561-789</div>
+    </div>
+
+    <div class="card">
+      <h3>Live updates</h3>
+      <ul>
+        <li><strong>Panel, API Fetch / dataLayer:</strong> every 1 s eval a tiny <em>stamp</em> (<code>gatewayStamp</code>, <code>dataLayerStamp</code>); full re-read only when it changed.</li>
+        <li><strong>Watch for changes:</strong> 1 s full re-read, re-render only if the JSON differs (<code>lastJson</code>).</li>
+        <li><strong>Navigation:</strong> <code>devtools.network.onNavigated</code> → re-read after 300 ms.</li>
+        <li><strong>Popup:</strong> reads once on open; no polling.</li>
+      </ul>
+      <div class="files">panel.ts:54-78, 134-168</div>
+    </div>
+
+    <div class="card">
+      <h3>Shared UI</h3>
+      <ul>
+        <li><code>tabs.ts</code>: <code>createTabStrip</code>, sliding marker, arrow-key nav; returns <code>select(id)</code>.</li>
+        <li><code>inspector.ts</code>: <code>SOURCES</code> (the four tabs), <code>renderBody</code> dispatch, <code>valueOf</code> (what Copy copies), <code>logExpression</code>.</li>
+        <li><code>json-tree.ts</code>: <code>&lt;details&gt;</code> tree, children built lazily on first open, filter opens every path to a match, key click copies its JS path.</li>
+      </ul>
+      <div class="files">src/shared/*</div>
+    </div>
+
+  </div>
+
+  <h2>Gotchas worth remembering</h2>
+  <ul>
+    <li><strong>Content scripts can't be ES modules</strong>, so <code>content.ts</code> and <code>gateway-hook.ts</code> import nothing; shared types are ambient in <code>src/global.d.ts</code> (an <code>import type</code> would make <code>tsc</code> emit <code>export {}</code>).</li>
+    <li><strong><code>IGNORED_PATHS</code> lives in two files</strong> (<code>gateway-hook.ts</code> and <code>readGateway</code>) because neither can import. Keep them in sync.</li>
+    <li><strong>Build before load:</strong> manifest points into <code>dist/</code>. <code>npm run build</code> = <code>tsc</code> + <code>scripts/copy-static.js</code>.</li>
+    <li><strong><code>__NEXT_DATA__</code> reflects the first server render</strong>; client-side route changes don't update it.</li>
+    <li><strong>Server-side (SSR) gateway calls are invisible</strong>; the hook only sees the browser.</li>
+    <li><strong>Pages open before the extension loaded</strong> have no hook, so API Fetch falls back to resource timing only (<code>recording: false</code>).</li>
+  </ul>
+
+  <h2>Primary sources</h2>
+  <ul>
+    <li><a href="https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts">Content scripts</a>: worlds, <code>run_at</code>, allowed APIs</li>
+    <li><a href="https://developer.chrome.com/docs/extensions/reference/api/scripting">chrome.scripting</a>: <code>executeScript</code>, function serialization</li>
+    <li><a href="https://developer.chrome.com/docs/extensions/reference/api/devtools/inspectedWindow">chrome.devtools.inspectedWindow</a>: <code>eval</code></li>
+    <li><a href="https://developer.chrome.com/docs/extensions/reference/api/commands">chrome.commands</a> · <a href="https://developer.chrome.com/docs/extensions/reference/api/action">chrome.action</a></li>
+  </ul>
+</main>
+<script src="../assets/extension-map.js"></script>
+</body>
+</html>

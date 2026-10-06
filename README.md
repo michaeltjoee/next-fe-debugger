@@ -1,4 +1,4 @@
-# next-fe debugger
+# TIX-FE-DEBUGGER
 
 Chrome extension (Manifest V3, TypeScript) for inspecting `window.__NEXT_DATA__` on Next.js **Pages Router** sites.
 
@@ -10,7 +10,7 @@ Chrome extension (Manifest V3, TypeScript) for inspecting `window.__NEXT_DATA__`
   - **Page Data**: `window.__NEXT_DATA__` and `window.__CORE_DATA__` in one scroll, each in its own section whose head (name, size, Copy) stays pinned while its tree scrolls. `__NEXT_DATA__` opens with its route and how props were fetched, with `props.pageProps` already open. A global the page doesn't have says so in its section. Sections fold, and stay folded across re-reads.
   - **dataLayer**: `window.dataLayer` (Google Tag Manager / gtag.js) grouped by event, one folded line per event with how many times it was pushed, in the order each event first fired. `gtag("event", "add_to_cart")` joins `dataLayer.push({ event: "add_to_cart" })`; other gtag calls group by command (e.g. `config G-XXXX`), and entries without an event under **No event**. GTM's own `gtm.*` events are drawn lighter than the page's. Open a group for its pushes in order (index and keys), and a push for its tree, with Copy; clicking a key copies its path (e.g. `dataLayer[12].ecommerce.items`). DOM elements (like GTM's `gtm.element`) show as `[button#push]`. In the DevTools panel the list updates as the page pushes, and new pushes get a yellow mark that fades (on the group, while it's folded). The filter opens the groups it matches. **Clear** hides the entries so far so only new pushes show; it marks the clear point on the page's array without changing its entries, so GTM and the page don't notice, and a page reload shows everything again.
   - The data tabs have a filter, Copy, and a **⋯** menu; the Version tab has no toolbar. On API Fetch the filter matches URLs, then bodies and headers, opening each match. On Page Data one filter searches both globals; the toolbar's Copy copies both, keyed by name.
-- **DevTools panel** (`__NEXT_DATA__` tab): collapsible JSON tree, filter by key/value, copy, auto-reload on navigation. The ⋯ menu holds **Show raw JSON**, **Watch for changes** (polls every second for client-side mutations; a yellow dot on ⋯ shows it's on), **Log to console** and **Reload data**. Follows the DevTools light/dark theme.
+- **DevTools panel** (`TIX-FE-DEBUGGER` tab): collapsible JSON tree, filter by key/value, copy, auto-reload on navigation. The ⋯ menu holds **Show raw JSON**, **Watch for changes** (polls every second for client-side mutations; a yellow dot on ⋯ shows it's on), **Log to console** and **Reload data**. Follows the DevTools light/dark theme.
 - **Filtering expands matches**: every path to a match opens, and a matching key (e.g. `sessionData`) shows its whole subtree.
 - **Click a key** to copy its JS path (e.g. `__NEXT_DATA__.props.pageProps.hotel.rating` on Page Data, so it pastes straight into the console).
 - **Popup**: the same tabs with filter and Copy, for the active browser tab. Keyboard shortcuts open it straight on a tab (or switch tabs while it's open): **Alt+Shift+D** Version, **Alt+Shift+F** API Fetch, **Alt+Shift+G** Page Data, **Alt+Shift+H** dataLayer (**⌥⇧** on Mac). Change them at `chrome://extensions/shortcuts`. Needs Chrome 127+ (for `chrome.action.openPopup`).
@@ -33,7 +33,7 @@ npm run typecheck
 1. `npm run build`
 2. Open `chrome://extensions`, enable **Developer mode**.
 3. **Load unpacked** → select this folder (the repo root, not `dist/`).
-4. Open a Next.js page → DevTools → **`__NEXT_DATA__`** tab (or click the toolbar icon).
+4. Open a Next.js page → DevTools → **`TIX-FE-DEBUGGER`** tab (or click the toolbar icon).
 
 After editing code, rebuild (or keep `npm run watch` running), hit the reload ↻ button on the extension card, then close/reopen DevTools.
 

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 1 · The Manifest Is the Entrypoint</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body>
+<main>
+  <nav class="crumbs"><a href="../reference/architecture-map.html">Reference: architecture map</a></nav>
+
+  <p class="kicker">next-fe debugger · Lesson 1</p>
+  <h1>There is no <code>main()</code>: the manifest is the entrypoint</h1>
+  <p class="lede">You asked where this repo starts. The answer is five places at once, and the reason why explains most of the code you'll read later.</p>
+
+  <div class="win">
+    <strong>Your win for this lesson</strong>
+    Point at any file in <code>src/</code> and say three things: who starts it, when, and what it can see.
+  </div>
+
+  <h2>Chrome is the program; you supply the parts</h2>
+  <p>
+    A Next.js app or a CLI has one entry file. A Chrome extension doesn't. Chrome is the running program, and it learns what your extension contains by reading <code>manifest.json</code> from the folder you load.
+    <span class="side">“The only prerequisite is to place the manifest.json file in the extension's root directory.” <a href="https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world">Chrome Docs, Hello World</a></span>
+    Every key in that file that names a script or page is an entrypoint: Chrome starts it, at a moment Chrome chooses, in a place Chrome chooses.
+  </p>
+  <p>
+    One wrinkle first: the manifest points into <code>dist/</code>, not <code>src/</code>. <code>npm run build</code> runs <code>tsc</code> to turn <code>src/**/*.ts</code> into <code>dist/**/*.js</code>, then <code>scripts/copy-static.js</code> copies every non-<code>.ts</code> file (the HTML, CSS and fonts) alongside. So edit <code>src/</code>, build, then reload the extension.
+  </p>
+
+  <h2>The map</h2>
+  <p>Here are the five entrypoints this repo declares, sorted onto the two sides they live on.</p>
+  <figure data-extension-map>
+    <figcaption>Blue: the extension's own pages and processes. Orange: inside the web page's tab. Arrows are the only ways information crosses between them.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Manifest key</th><th>Starts</th><th>When</th><th>Lives in</th></tr></thead>
+    <tbody>
+      <tr><td><code>background.service_worker</code></td><td><code>background.js</code></td><td>When an event it listens for fires (a message, a shortcut)</td><td>Extension · service worker</td></tr>
+      <tr><td><code>content_scripts[0]</code></td><td><code>content.js</code></td><td>Every page, at <code>document_idle</code></td><td>Page tab · isolated world</td></tr>
+      <tr><td><code>content_scripts[1]</code></td><td><code>gateway-hook.js</code></td><td>Every page, at <code>document_start</code></td><td>Page tab · MAIN world</td></tr>
+      <tr><td><code>action.default_popup</code></td><td><code>popup.html</code> → <code>popup.js</code></td><td>Click the toolbar icon, or an <kbd>Alt</kbd><kbd>Shift</kbd> shortcut</td><td>Extension page</td></tr>
+      <tr><td><code>devtools_page</code></td><td><code>devtools.html</code> → <code>devtools.js</code> → <code>panel.js</code></td><td>Each time DevTools opens</td><td>Extension page inside DevTools</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    Everything in <code>src/shared/</code> is <em>not</em> an entrypoint. It's imported by <code>popup.ts</code> and <code>panel.ts</code>, which is why the popup and the DevTools panel show the same four tabs.
+  </p>
+
+  <h2>The walls: “worlds”</h2>
+  <p>
+    The two orange boxes run in the same browser tab but can't see each other's variables. Chrome calls each one a <em>world</em>.
+    <span class="side">“An isolated world is a private execution environment that isn't accessible to the page or other extensions.” <a href="https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts">Chrome Docs, Content scripts</a></span>
+    Both worlds share the page's DOM, but JavaScript variables like <code>window.__NEXT_DATA__</code> exist only in the MAIN world, where the page's own scripts run.
+  </p>
+  <p>Three design decisions in this repo follow directly from that wall:</p>
+  <ol>
+    <li><strong><code>content.ts</code> reads a <code>&lt;script&gt;</code> tag, not a variable.</strong> It's in the isolated world, so <code>window.__NEXT_DATA__</code> is invisible to it. But Next.js also writes the same JSON into <code>&lt;script id="__NEXT_DATA__"&gt;</code>, which is DOM, so it parses that instead (<a href="../../src/content.ts">src/content.ts:1-2</a> says exactly this).</li>
+    <li><strong><code>gateway-hook.ts</code> must run in the MAIN world, at <code>document_start</code>.</strong> Its job is to replace the page's <code>window.fetch</code> with a recording wrapper. Only the MAIN world has the page's <code>fetch</code>, and <code>document_start</code> runs “before any other DOM is constructed or any other script is run”, so the wrapper is in place before the page makes its first call.</li>
+    <li><strong>The popup and panel have to <em>ask</em> Chrome to run code in the page.</strong> They're on the blue side, with no window into the page at all. That's what the two blue arrows are, and it's the whole of Lesson 2.</li>
+  </ol>
+
+  <h2>Trace one feature end to end: the toolbar icon</h2>
+  <p>The smallest complete feature is the icon turning blue on Next.js pages. Three hops, two files.</p>
+
+  <span class="src">src/content.ts:4-14 (simplified) · isolated world, every page</span>
+<pre><code>(() =&gt; {
+  const el = document.getElementById("__NEXT_DATA__");   // DOM: visible from the isolated world
+  let page: string | undefined;
+  if (el) {
+    try { page = (JSON.parse(el.textContent ?? "") as NextData).page; } catch {}
+  }
+  const msg: NextDataDetectedMessage = { type: "next-data-detected", found: !!el, page };
+  chrome.runtime.sendMessage(msg);                        // hop across to the extension side
+})();</code></pre>
+
+  <span class="src">src/background.ts:7-18 (simplified) · service worker</span>
+<pre><code>chrome.runtime.onMessage.addListener((msg, sender) =&gt; {
+  const tabId = sender.tab?.id;                           // which tab sent it
+  if (msg?.type !== "next-data-detected" || !tabId) return;
+  chrome.action.setIcon({ tabId, path: msg.found ? ICONS.active : ICONS.idle });
+  chrome.action.setTitle({ tabId, title: /* … */ });
+});</code></pre>
+
+  <p>
+    Why not set the icon straight from <code>content.ts</code>? Because content scripts may only use a short list of extension APIs: <code>dom</code>, <code>i18n</code>, <code>storage</code> and parts of <code>runtime</code>, including <code>sendMessage</code>.
+    <span class="side">“Content scripts are unable to access other APIs directly. But they can access them indirectly by exchanging messages with other parts of your extension.” <a href="https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts#understand-content-script-capabilities">Chrome Docs</a></span>
+    <code>chrome.action</code> isn't on it, so the content script sends a message and the service worker, which <em>can</em> call <code>chrome.action</code>, does the work. Passing <code>tabId</code> makes the icon change for that tab only.
+  </p>
+  <figure data-extension-map data-highlight="badge">
+    <figcaption>The badge flow: the only arrow that points from the page side to the extension side.</figcaption>
+  </figure>
+
+  <hr />
+
+  <h2>Practice: retrieve, don't re-read</h2>
+  <p>Answer from memory. Scroll up only after you've committed to an answer.</p>
+
+  <div class="quiz">
+    <div class="q" data-correct="0">
+      <p class="prompt">A page starts loading. Which of this extension's scripts runs first?</p>
+      <ol class="choices">
+        <li><code>gateway-hook.js</code> in the MAIN world</li>
+        <li><code>content.js</code> in the isolated world</li>
+        <li><code>background.js</code> in the service worker</li>
+        <li><code>panel.js</code> in the DevTools page</li>
+      </ol>
+      <p class="why"><code>gateway-hook.js</code> is declared with <code>run_at: document_start</code>, before any page script. <code>content.js</code> waits for <code>document_idle</code>; <code>background.js</code> only wakes for events; <code>panel.js</code> only exists while DevTools is open.</p>
+    </div>
+
+    <div class="q" data-correct="2">
+      <p class="prompt">Why does <code>content.ts</code> parse the <code>&lt;script id="__NEXT_DATA__"&gt;</code> tag instead of reading <code>window.__NEXT_DATA__</code>?</p>
+      <ol class="choices">
+        <li>The script tag updates on every navigation</li>
+        <li>Reading window variables needs the scripting permission</li>
+        <li>Its isolated world can't see page variables</li>
+        <li>Content scripts can't call JSON.parse on objects</li>
+      </ol>
+      <p class="why">The isolated world shares the DOM with the page but not its JavaScript variables. The tag is DOM, so it's readable. (And the tag doesn't update on navigation; neither does the global.)</p>
+    </div>
+
+    <div class="q" data-correct="1">
+      <p class="prompt"><code>gateway-hook.js</code> is declared with <code>world: "MAIN"</code>. What would break if it ran in the isolated world instead?</p>
+      <ol class="choices">
+        <li>It could no longer read the response body text</li>
+        <li>It would wrap its own fetch, not the page's</li>
+        <li>Chrome would refuse to inject it at document_start time</li>
+        <li>The service worker would then stop receiving its messages</li>
+      </ol>
+      <p class="why">Each world has its own <code>window</code> object. Replacing <code>window.fetch</code> in the isolated world changes nothing the page calls, so no ms-gateway call would ever be recorded.</p>
+    </div>
+
+    <div class="q" data-correct="3">
+      <p class="prompt">Who actually changes the toolbar icon to the blue ticket?</p>
+      <ol class="choices">
+        <li><code>content.js</code>, by calling setIcon during page load</li>
+        <li><code>popup.js</code>, after reading __NEXT_DATA__ from the page</li>
+        <li><code>gateway-hook.js</code>, on spotting the page's __NEXT_DATA__ global</li>
+        <li><code>background.js</code>, after content.js sends it a message</li>
+      </ol>
+      <p class="why"><code>chrome.action</code> isn't available to content scripts, so <code>content.js</code> only reports; the service worker calls <code>setIcon</code> with the sender's <code>tabId</code>.</p>
+    </div>
+
+    <div class="q" data-correct="0">
+      <p class="prompt">You edit <code>src/popup/popup.ts</code>, reload the extension, and nothing changes. Most likely cause?</p>
+      <ol class="choices">
+        <li>manifest.json points at dist/, which wasn't rebuilt</li>
+        <li>Popups stay cached until you restart Chrome</li>
+        <li>The service worker holds the old popup</li>
+        <li>Content scripts need the page to reload</li>
+      </ol>
+      <p class="why">Chrome only ever loads <code>dist/</code>. Run <code>npm run build</code> (or keep <code>npm run watch</code> going) first.</p>
+    </div>
+  </div>
+  <p class="score"></p>
+
+  <h3>Trace it yourself</h3>
+  <p>
+    Press <kbd>Alt</kbd><kbd>Shift</kbd><kbd>F</kbd> on a page. Using only <a href="../../manifest.json">manifest.json</a>, <a href="../../src/background.ts">src/background.ts</a> and <a href="../../src/popup/popup.ts">src/popup/popup.ts</a>, write down every hop until the API Fetch tab is showing. Then: what happens if the popup is <em>already open</em> when you press it?
+  </p>
+  <details class="recall">
+    <summary>Reveal once you've written your trace</summary>
+    <ol>
+      <li><code>manifest.json</code> declares the command <code>open-gateway</code> with <code>suggested_key Alt+Shift+F</code>.</li>
+      <li>Chrome fires <code>chrome.commands.onCommand</code> in the service worker (<a href="../../src/background.ts">background.ts:26</a>) with <code>"open-gateway"</code>.</li>
+      <li>It temporarily points this tab's popup at <code>popup.html?tab=gateway</code> (<code>setPopup</code>), opens it (<code>openPopup</code>, Chrome 127+), and in <code>finally</code> points it back at plain <code>popup.html</code>.</li>
+      <li><a href="../../src/popup/popup.ts">popup.ts:19</a> reads <code>?tab=gateway</code> from its own URL and starts on that tab.</li>
+    </ol>
+    <p><strong>Already open:</strong> <code>openPopup</code> fails (the error is swallowed by the empty <code>catch</code>). But the open popup is an extension page too, and it registers its <em>own</em> <code>onCommand</code> listener (<a href="../../src/popup/popup.ts">popup.ts:32-35</a>), so it receives the same command and switches tabs itself. One keypress, two listeners.</p>
+  </details>
+
+  <hr />
+
+  <div class="next">
+    <strong>Read this next (primary source):</strong>
+    <a href="https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts">Chrome Docs: Content scripts</a>. Focus on “isolated worlds”, the <code>world</code> option and <code>run_at</code>. About ten minutes, and it backs every claim on the orange side of the map.
+  </div>
+  <div class="next">
+    <strong>Coming up, Lesson 2:</strong> how the popup and panel reach across the wall. <code>readNextData</code> is turned into a string with <code>.toString()</code> and re-run inside the page, which is why it has to be completely self-contained.
+  </div>
+  <div class="ask">
+    <strong>Stuck or curious?</strong> Ask me anything about this lesson in the chat: “why is the service worker allowed to sleep?”, “what if a page has no <code>&lt;script id=__NEXT_DATA__&gt;</code>?”, or paste your trace and I'll check it. Telling me your quiz score helps me pitch the next lesson.
+  </div>
+</main>
+<script src="../assets/extension-map.js"></script>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

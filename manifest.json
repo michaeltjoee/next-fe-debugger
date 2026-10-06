@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "next-fe debugger",
+  "name": "TIX-FE-DEBUGGER",
   "version": "0.1.0",
   "description": "Inspect window.__NEXT_DATA__ on Next.js (Pages Router) sites.",
   "permissions": [
@@ -32,7 +32,7 @@
     }
   ],
   "action": {
-    "default_title": "next-fe debugger",
+    "default_title": "TIX-FE-DEBUGGER",
     "default_popup": "dist/popup/popup.html",
     "default_icon": {
       "16": "icons/idle16.png",
