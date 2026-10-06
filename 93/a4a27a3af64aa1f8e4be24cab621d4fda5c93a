@@ -1,0 +1,30 @@
+src/devtools/panel.ts
+  s_dd6e2aa0b4f891::t_ed23a8b3715d94 3,88,90-91
+README.md
+  s_dd6e2aa0b4f891::t_234f4d13b17eb1 9
+src/global.d.ts
+  s_dd6e2aa0b4f891::t_7f2cae08e2f5ef 24-25
+src/shared/read-next-data.ts
+  s_dd6e2aa0b4f891::t_35dbc11bb7f4a5 17,25-27,166,172,199-200,205-207,218-227
+src/popup/popup.ts
+  s_dd6e2aa0b4f891::t_ed23a8b3715d94 1,69,71,73
+src/shared/inspector.ts
+  s_dd6e2aa0b4f891::t_ed23a8b3715d94 61-63,87-88,95,339-340,345,370-372,404-405,424-436
+  s_dd6e2aa0b4f891::t_8373a2cdb51fcf 419-423
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.11",
+  "base_commit_sha": "93a4a27a3af64aa1f8e4be24cab621d4fda5c93a",
+  "prompts": {},
+  "sessions": {
+    "s_dd6e2aa0b4f891": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6057aef4-bdd9-4dd1-bf10-f1ba681ff997",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "michaeltjoee <113000037+michaeltjoee@users.noreply.github.com>"
+    }
+  }
+}
