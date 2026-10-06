@@ -130,16 +130,21 @@ function renderVersion(out: HTMLElement, result: NextDataResult): void {
       navigator.clipboard.writeText(main.version);
       flash(number);
     });
-    const hero = el("section", "version");
-    hero.append(
+    // A boarding pass: the build on the ticket, what it loaded on the stub past the perforation.
+    const ticket = el("div", "pass-main");
+    ticket.append(
       el("div", "version-service", main.service || "(root)"),
       number,
       el("div", "version-where", `Served from ${new URL(main.origin).host}`),
     );
-    parts.push(hero);
+    const stub = el("div", "pass-stub");
+    stub.append(assetCounts(service, result.shared.length));
+    const pass = el("section", "pass");
+    pass.append(ticket, stub);
+    parts.push(pass);
+  } else {
+    parts.push(assetCounts(service, result.shared.length));
   }
-
-  parts.push(assetCounts(service, result.shared.length));
 
   for (const b of result.bundles) {
     const name = `${b.service || "(root)"} ${b.version}`;
@@ -178,7 +183,7 @@ function assetCounts(service: number, shared: number): HTMLElement {
   };
   table.append(
     row("Service", "service", service),
-    row("Shared components (remote)", "remote", shared),
+    row("Shared components", "remote", shared),
     row("Total", "", service + shared),
   );
   const section = el("section", "weight");
@@ -365,6 +370,7 @@ function renderGateway(
   callRows.set(out, next);
 
   const rows = [...next.values()];
+  placeTimings(log.calls, rows);
   const list = el("div", "calls");
   if (rows.length) list.append(...rows);
   else if (needle) list.append(emptyNote("No calls match the filter."));
@@ -450,16 +456,40 @@ function formatMs(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`;
 }
 
+/**
+ * Each row's bar in the timing column, like the Network panel's waterfall: where the call
+ * started and how long it took, against the span of every call listed. Rows are reused,
+ * so this runs on every render as the span grows.
+ */
+function placeTimings(calls: GatewayCall[], rows: HTMLDetailsElement[]): void {
+  const ends = calls.map((c) => c.startedAt + (c.duration ?? 0));
+  const from = Math.min(...calls.map((c) => c.startedAt));
+  const span = Math.max(Math.max(...ends) - from, 1);
+  const byId = new Map(calls.map((c) => [c.id, c]));
+  for (const row of rows) {
+    const call = byId.get(Number(row.dataset.call!.split(":").pop()));
+    if (!call) continue;
+    const start = (call.startedAt - from) / span;
+    const width = call.duration == null ? 1 - start : call.duration / span;
+    row.style.setProperty("--at", `${(start * 100).toFixed(2)}%`);
+    row.style.setProperty("--took", `${(width * 100).toFixed(2)}%`);
+  }
+}
+
 function callRow(call: GatewayCall, id: string, needle: string, raw: boolean, open: boolean): HTMLDetailsElement {
-  const row = el("details", "call");
+  const row = el("details", isFailed(call) ? "call failed" : call.duration == null ? "call pending" : "call");
   row.dataset.call = id;
 
   const head = el("summary");
   head.title = `${call.method || call.via} ${call.url}\nStarted ${formatMs(call.startedAt)} after page load, via ${call.via}`;
+  const timing = el("span", "call-timing");
+  timing.setAttribute("aria-hidden", "true");
+  timing.append(el("i"));
   head.append(
+    callStatus(call),
     el("span", "call-method", call.method),
     callPath(call.url),
-    callStatus(call),
+    timing,
     el("span", "call-time num quiet", call.duration == null ? "" : formatMs(call.duration)),
   );
   row.append(head);

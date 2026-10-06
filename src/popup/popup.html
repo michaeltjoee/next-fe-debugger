@@ -8,11 +8,13 @@
     </style>
   </head>
   <body class="shell">
-    <header id="tabs" class="band"></header>
-    <div id="toolbar" class="toolbar" hidden>
-      <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
-      <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
-    </div>
+    <header class="bar">
+      <nav id="tabs"></nav>
+      <div id="toolbar" class="toolbar" hidden>
+        <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
+        <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
+      </div>
+    </header>
     <main id="out" class="out tree"><div class="empty">Reading this page…</div></main>
     <script type="module" src="popup.js"></script>
   </body>

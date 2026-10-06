@@ -5,14 +5,16 @@
     <link rel="stylesheet" href="../shared/tree.css" />
   </head>
   <body class="shell">
-    <header id="tabs" class="band"></header>
-    <div id="toolbar" class="toolbar" hidden>
-      <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
-      <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
-      <button id="more" class="more" type="button" popovertarget="menu" aria-haspopup="menu" aria-label="More actions" title="More actions">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
-      </button>
-    </div>
+    <header class="bar">
+      <nav id="tabs"></nav>
+      <div id="toolbar" class="toolbar" hidden>
+        <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
+        <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
+        <button id="more" class="more" type="button" popovertarget="menu" aria-haspopup="menu" aria-label="More actions" title="More actions">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
+        </button>
+      </div>
+    </header>
     <div id="menu" class="menu" popover role="menu" aria-label="More actions">
       <button id="raw" type="button" role="menuitemcheckbox" aria-checked="false">Show raw JSON</button>
       <button id="watch" type="button" role="menuitemcheckbox" aria-checked="false" title="Re-read every second and update when the data changes">Watch for changes</button>

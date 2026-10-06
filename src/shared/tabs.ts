@@ -1,5 +1,5 @@
-// Tab strip. The active tab is drawn by one paper-coloured "marker" that slides
-// between tabs and joins the tab to the content below, like a folder tab.
+// Tab strip. The active tab is drawn by one "marker", a small punched ticket,
+// that slides between tabs.
 // Returns a function that selects a tab, as if it were clicked.
 export function createTabStrip<Id extends string>(
   container: HTMLElement,
