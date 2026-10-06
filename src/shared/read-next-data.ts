@@ -22,6 +22,8 @@ export interface GatewayResult {
   /** Hook version and timed-call count; changes whenever the list would. See gatewayStamp. */
   stamp: string;
   calls: GatewayCall[];
+  /** Paths left out of `calls` on purpose, with how many times the browser timed each. */
+  ignored: { path: string; count: number }[];
 }
 
 /** What the dataLayer tab lists: window.dataLayer from the last Clear on. */
@@ -155,9 +157,18 @@ export function readNextData(): NextDataResult {
   function readGateway(): GatewayResult {
     const log: GatewayLog | undefined = window.__MS_GATEWAY__;
     const calls: GatewayCall[] = log ? JSON.parse(JSON.stringify(log.calls)) : [];
-    const timed = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
+    // Same as IGNORED_PATHS in gateway-hook.ts; keep them in sync.
+    const ignored = ["tix-inbox/userInbox/unreadCount", "tix-chat-platform/v1/users/unread_count"].map(
+      (path) => ({ path, count: 0 }),
+    );
+    const all = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
       (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
     );
+    const timed = all.filter((e) => {
+      const match = ignored.find((i) => new URL(e.name).pathname.includes(i.path));
+      if (match) match.count++;
+      return !match;
+    });
     const recorded = new Map<string, number>();
     for (const c of calls) recorded.set(c.url, (recorded.get(c.url) ?? 0) + 1);
     timed.forEach((e, i) => {
@@ -185,8 +196,10 @@ export function readNextData(): NextDataResult {
     return {
       recording: !!log,
       session: log?.session ?? performance.timeOrigin,
-      stamp: `${log?.version ?? 0}:${timed.length}`,
+      // Counts ignored calls too, so their counts stay current.
+      stamp: `${log?.version ?? 0}:${all.length}`,
       calls,
+      ignored,
     };
   }
 }

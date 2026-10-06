@@ -338,6 +338,8 @@ body {
 .call-more { margin-top: 10px; }
 .call-more > summary { font: 700 13px/1.6 var(--sans); letter-spacing: -0.01em; }
 .call-payload > .empty { padding: 4px 0; }
+/* Paths left out on purpose, folded under the list. */
+.ignored { margin-top: 16px; }
 
 /* ---------- dataLayer tab ---------- */
 

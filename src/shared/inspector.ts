@@ -83,7 +83,9 @@ export function renderBody(
     return;
   }
   if (valueOf(result, id) == null) {
+    const open = isIgnoredOpen(out);
     out.replaceChildren(emptyNote(missingMessage(result, id)));
+    if (id === "gateway" && result.gateway.ignored.length) out.append(ignoredPaths(result.gateway.ignored, open));
     return;
   }
   if (id === "version") renderVersion(out, result);
@@ -367,7 +369,32 @@ function renderGateway(
   if (!log.recording) {
     parts.push(emptyNote("Not recording on this page, so these calls have no bodies. Reload the page to record them."));
   }
-  out.replaceChildren(...parts, list);
+  parts.push(list);
+  if (log.ignored.length) parts.push(ignoredPaths(log.ignored, isIgnoredOpen(out)));
+  out.replaceChildren(...parts);
+}
+
+/** Polling re-renders the tab, so the ignored list keeps whatever the user last chose; closed at first. */
+const isIgnoredOpen = (out: HTMLElement) => !!out.querySelector<HTMLDetailsElement>("details.ignored")?.open;
+
+/** The paths the tab leaves out on purpose (see IGNORED_PATHS in gateway-hook.ts), with how often each was called. */
+function ignoredPaths(ignored: GatewayResult["ignored"], open: boolean): HTMLDetailsElement {
+  const group = el("details", "assets ignored");
+  group.open = open;
+  const head = el("summary");
+  head.title = "Background polling calls left out of the list above";
+  const total = ignored.reduce((n, i) => n + i.count, 0);
+  head.append(el("span", "assets-name", "Ignored paths"), el("span", "num quiet", plural(total, "call")));
+  group.append(head);
+
+  const list = el("ul");
+  list.append(...ignored.map(({ path, count }) => {
+    const li = el("li");
+    li.append(el("span", "path", path), el("span", "num quiet", plural(count, "call")));
+    return li;
+  }));
+  group.append(list);
+  return group;
 }
 
 function gatewaySummary(calls: GatewayCall[], shown: number, filtered: boolean): HTMLElement {

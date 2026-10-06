@@ -7,6 +7,7 @@
   const MAX_CALLS = 300;
   const MAX_BODY_CHARS = 1_000_000;
   // Gateway paths that poll in the background and would only crowd the list.
+  // Also copied into readGateway in shared/read-next-data.ts, which lists them in the tab; keep them in sync.
   const IGNORED_PATHS = [
     "tix-inbox/userInbox/unreadCount",
     "tix-chat-platform/v1/users/unread_count",
