@@ -4,22 +4,23 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../shared/tree.css" />
   </head>
-  <body>
-    <div class="toolbar">
-      <button id="refresh" title="Re-read from the page">Refresh</button>
-      <input id="filter" type="search" placeholder="Filter keys / values…" />
-      <select id="view" title="View">
-        <option value="tree">Tree</option>
-        <option value="raw">Raw JSON</option>
-      </select>
-      <button id="copy" title="Copy full JSON">Copy</button>
-      <button id="log" title="console.log in the page">Log</button>
-      <label title="Poll every second and re-render when the value changes">
+  <body class="shell">
+    <header id="tabs" class="band"></header>
+    <div id="status" class="status"></div>
+    <div id="toolbar" class="toolbar" hidden>
+      <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
+      <div class="seg" role="group" aria-label="View">
+        <button id="view-tree" type="button" aria-pressed="true">Tree</button>
+        <button id="view-raw" type="button" aria-pressed="false">JSON</button>
+      </div>
+      <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
+      <button id="log" type="button" title="console.log this tab's data in the page">Log</button>
+      <label class="check" title="Re-read every second and update when the data changes">
         <input id="watch" type="checkbox" /> Watch
       </label>
+      <button id="refresh" type="button" title="Read the data from the page again">Refresh</button>
     </div>
-    <div id="status" class="status"></div>
-    <div id="out" class="tree"></div>
+    <main id="out" class="out tree"></main>
     <script type="module" src="panel.js"></script>
   </body>
 </html>

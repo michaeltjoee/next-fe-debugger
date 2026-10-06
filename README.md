@@ -1,4 +1,4 @@
-# Next Data Debugger
+# next-fe debugger
 
 Chrome extension (Manifest V3, TypeScript) for inspecting `window.__NEXT_DATA__` on Next.js **Pages Router** sites.
 

@@ -4,17 +4,17 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../shared/tree.css" />
     <style>
-      body { width: 480px; max-height: 560px; }
-      #out { max-height: 440px; }
+      .shell { width: 480px; height: 560px; }
     </style>
   </head>
-  <body>
-    <div class="toolbar">
-      <input id="filter" type="search" placeholder="Filter keys / values…" />
-      <button id="copy">Copy JSON</button>
+  <body class="shell">
+    <header id="tabs" class="band"></header>
+    <div id="status" class="status"></div>
+    <div id="toolbar" class="toolbar" hidden>
+      <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
+      <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
     </div>
-    <div id="status" class="status">Loading…</div>
-    <div id="out" class="tree"></div>
+    <main id="out" class="out tree"><div class="empty">Reading this page…</div></main>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

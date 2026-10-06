@@ -17,6 +17,8 @@ interface Window {
   __NEXT_DATA__?: NextData;
   /** App Router RSC payload chunks. */
   __next_f?: unknown[];
+  /** App-specific global shown in the second tab. */
+  __CORE_DATA__?: unknown;
 }
 
 interface NextDataDetectedMessage {

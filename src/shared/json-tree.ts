@@ -16,7 +16,14 @@ export function renderTree(
   const needle = filter.trim().toLowerCase();
   const node = buildNode(null, value, "$", 0, expandDepth, needle);
   if (node) container.append(node);
-  else container.textContent = needle ? "No matches." : "Empty.";
+  else container.append(emptyNote(needle ? "No keys or values match the filter." : "Empty."));
+}
+
+export function emptyNote(text: string): HTMLDivElement {
+  const div = document.createElement("div");
+  div.className = "empty";
+  div.textContent = text;
+  return div;
 }
 
 function isBranch(value: unknown): value is object {
@@ -27,9 +34,12 @@ function entriesOf(value: object): [Key, unknown][] {
   return Array.isArray(value) ? value.map((v, i) => [i, v]) : Object.entries(value);
 }
 
+function keyMatches(key: Key, needle: string): boolean {
+  return key != null && String(key).toLowerCase().includes(needle);
+}
+
 function matches(key: Key, value: unknown, needle: string): boolean {
-  if (!needle) return true;
-  if (key != null && String(key).toLowerCase().includes(needle)) return true;
+  if (!needle || keyMatches(key, needle)) return true;
   if (!isBranch(value)) return String(value).toLowerCase().includes(needle);
   return entriesOf(value).some(([k, v]) => matches(k, v, needle));
 }
@@ -78,7 +88,10 @@ function buildNode(
 
   const entries = entriesOf(value);
   const details = document.createElement("details");
+  // Filtering opens the path to every match.
   details.open = depth < expandDepth || !!needle;
+  // A key that matches shows its whole subtree, not just the parts that match again.
+  const childNeedle = needle && keyMatches(key, needle) ? "" : needle;
 
   const summary = document.createElement("summary");
   if (key != null) summary.append(label, ": ");
@@ -95,7 +108,7 @@ function buildNode(
     const children = document.createElement("div");
     children.className = "children";
     for (const [k, v] of entries) {
-      const child = buildNode(k, v, pathFor(path, k), depth + 1, expandDepth, needle);
+      const child = buildNode(k, v, pathFor(path, k), depth + 1, expandDepth, childNeedle);
       if (child) children.append(child);
     }
     details.append(children);
