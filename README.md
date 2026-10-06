@@ -6,11 +6,12 @@ Chrome extension (Manifest V3, TypeScript) for inspecting `window.__NEXT_DATA__`
 
 - **Three tabs**, opening on **Version**:
   - **Version**: the service name and deployed version (e.g. `homepage-v4` `v4.5.0`), read from asset URLs shaped like `…/<service>/v4.5.0/_next/…` (script and link tags, plus resources loaded later). The build that `__NEXT_DATA__.assetPrefix` points at is the headline (click the version to copy it); under it, file counts for the service's build against assets from `…/shared-components/…` (remote), with a total. Each build's files are listed below in collapsed groups.
-  - **Next Data** (`window.__NEXT_DATA__`) and **Core Data** (`window.__CORE_DATA__`), each opening with a one-line summary (route and how props were fetched for `__NEXT_DATA__`, then the size).
-  - The data tabs have a filter, Copy, and a **⋯** menu; the Version tab has no toolbar.
+  - **API Fetch**: every call the page makes from the browser to `…/ms-gateway/…` (fetch and XHR), in order: method, path (service first), status and time. Open a call for its response as a tree (with Copy), then its request (query, body, headers) and response headers. Failed calls (HTTP 4xx/5xx or no response) are red, and a response `code` other than `SUCCESS` shows under the status. In the DevTools panel the list updates as calls happen. Calls the extension didn't record (e.g. the page was open before the extension loaded) still show, from the browser's resource timing, marked not recorded and without bodies. Calls made on the server during SSR aren't visible.
+  - **Page Data**: `window.__NEXT_DATA__` and `window.__CORE_DATA__` in one scroll, each in its own section whose head (name, size, Copy) stays pinned while its tree scrolls. `__NEXT_DATA__` opens with its route and how props were fetched, with `props.pageProps` already open. A global the page doesn't have says so in its section. Sections fold, and stay folded across re-reads.
+  - The data tabs have a filter, Copy, and a **⋯** menu; the Version tab has no toolbar. On API Fetch the filter matches URLs, then bodies and headers, opening each match. On Page Data one filter searches both globals; the toolbar's Copy copies both, keyed by name.
 - **DevTools panel** (`__NEXT_DATA__` tab): collapsible JSON tree, filter by key/value, copy, auto-reload on navigation. The ⋯ menu holds **Show raw JSON**, **Watch for changes** (polls every second for client-side mutations; a yellow dot on ⋯ shows it's on), **Log to console** and **Reload data**. Follows the DevTools light/dark theme.
 - **Filtering expands matches**: every path to a match opens, and a matching key (e.g. `sessionData`) shows its whole subtree.
-- **Click a key** to copy its JS path (e.g. `$.props.pageProps.hotel.rating`).
+- **Click a key** to copy its JS path (e.g. `__NEXT_DATA__.props.pageProps.hotel.rating` on Page Data, so it pastes straight into the console).
 - **Popup**: the same tabs with filter and Copy, for the active browser tab.
 - **Badge**: toolbar icon shows `N` on pages that ship a `<script id="__NEXT_DATA__">`.
 - Detects **App Router** pages (no `__NEXT_DATA__`, uses `self.__next_f`) and says so.
@@ -41,17 +42,18 @@ After editing code, rebuild (or keep `npm run watch` running), hit the reload �
 python3 -m http.server -d test 8080
 ```
 
-Then visit http://localhost:8080/fixture.html.
+Then visit http://localhost:8080/fixture.html. It also calls ms-gateway endpoints served from `test/ms-gateway/` (plus a 404 and a POST the server rejects), for the API Fetch tab.
 
 ## How it works
 
 | Piece | World | Reads |
 | --- | --- | --- |
+| `src/gateway-hook.ts` | page, at `document_start` | wraps `fetch`/`XMLHttpRequest` and records `…/ms-gateway/…` calls into `window.__MS_GATEWAY__` (last 300, bodies over 1 MB not kept) |
 | `src/content.ts` | isolated | `<script id="__NEXT_DATA__">` text → tells background to set badge |
 | `src/devtools/panel.ts` | page (via `inspectedWindow.eval`) | live `window.__NEXT_DATA__`, falls back to script tag |
 | `src/popup/popup.ts` | page (via `scripting.executeScript({ world: "MAIN" })`) | same as panel |
 
-Shared logic lives in `src/shared/` (`read-next-data.ts` is serialized and injected, so it must stay self-contained). `inspector.ts` defines the tabs and renders each tab's body (summary line included) for both surfaces; `tabs.ts` is the tab strip. `__CORE_DATA__` is read from `window` only (no script-tag fallback).
+Shared logic lives in `src/shared/` (`read-next-data.ts` is serialized and injected, so it must stay self-contained). `inspector.ts` defines the tabs and renders each tab's body for both surfaces; `tabs.ts` is the tab strip. `__CORE_DATA__` is read from `window` only (no script-tag fallback).
 
 Fonts (Plus Jakarta Sans, JetBrains Mono) are bundled in `src/shared/fonts/` under the SIL Open Font License. Shared types (`NextData`, the `Window` augmentation, the badge message) are ambient in `src/global.d.ts`, because `content.ts` must not import anything: content scripts can't be ES modules.
 

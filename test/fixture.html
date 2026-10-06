@@ -16,6 +16,7 @@
     <div id="__next">Fixture page — open DevTools → __NEXT_DATA__ tab.</div>
     <button id="mutate">Mutate window.__NEXT_DATA__ (test Watch)</button>
     <button id="login">Toggle logged-in sessionData (test Watch)</button>
+    <button id="gateway">Call ms-gateway (test API Fetch tab)</button>
     <script id="__NEXT_DATA__" type="application/json">
       {
         "props": {
@@ -59,13 +60,28 @@
     </script>
     <script>
       window.__NEXT_DATA__ = JSON.parse(document.getElementById("__NEXT_DATA__").textContent);
-      // Stand-in for the app's own global, shown in the __CORE_DATA__ tab.
+      // Stand-in for the app's own global, shown in the Page Data tab.
       window.__CORE_DATA__ = {
         env: "fixture",
         lang: "id",
         currency: "IDR",
         featureFlags: { wishlist: true, tripView: false },
       };
+      // ms-gateway calls for the API Fetch tab, served from test/ms-gateway/. A 200 with a
+      // non-SUCCESS code, a 404, and a POST (python's http.server answers 501) cover the states.
+      const gatewayCalls = () => {
+        fetch("/ms-gateway/tix-hotel-search/v2/search.json?q=bali&page=1", {
+          headers: { "x-channel-id": "DESKTOP", "accept-language": "id" },
+        });
+        fetch("/ms-gateway/tix-promo/v1/banner.json?page=hotel");
+        fetch("/ms-gateway/tix-review/v1/summary?hotelId=123");
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/ms-gateway/tix-cart/v1/add");
+        xhr.setRequestHeader("content-type", "application/json");
+        xhr.send(JSON.stringify({ hotelId: 123, rooms: 1, checkIn: "2026-10-10" }));
+      };
+      gatewayCalls();
+      document.getElementById("gateway").onclick = gatewayCalls;
       document.getElementById("mutate").onclick = () => {
         window.__NEXT_DATA__.props.pageProps.hotel.rating = +(Math.random() * 5).toFixed(1);
       };

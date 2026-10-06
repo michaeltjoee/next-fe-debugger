@@ -5,17 +5,25 @@ type Key = string | number | null;
 export interface RenderTreeOptions {
   filter?: string;
   expandDepth?: number;
+  /** Where copied key paths start, e.g. `__NEXT_DATA__` so they paste straight into the console. */
+  rootPath?: string;
+  /** Start at the root's entries, for when something around the tree already folds it. */
+  hideRoot?: boolean;
 }
 
 export function renderTree(
   container: HTMLElement,
   value: unknown,
-  { filter = "", expandDepth = 1 }: RenderTreeOptions = {},
+  { filter = "", expandDepth = 1, rootPath = "$", hideRoot = false }: RenderTreeOptions = {},
 ): void {
   container.replaceChildren();
   const needle = filter.trim().toLowerCase();
-  const node = buildNode(null, value, "$", 0, expandDepth, needle);
-  if (node) container.append(node);
+  const nodes =
+    hideRoot && isBranch(value)
+      ? entriesOf(value).map(([k, v]) => buildNode(k, v, pathFor(rootPath, k), 1, expandDepth, needle))
+      : [buildNode(null, value, rootPath, 0, expandDepth, needle)];
+  const shown = nodes.filter((n) => n != null);
+  if (shown.length) container.append(...shown);
   else container.append(emptyNote(needle ? "No keys or values match the filter." : "Empty."));
 }
 

@@ -26,6 +26,7 @@
   --focus: #005acc;
   --service: #005acc; /* swatch for the page's own build */
   --remote: #e07b00; /* shared components; orange so it stays apart from blue for colour-blind eyes */
+  --error: #c62828; /* failed gateway calls */
 
   --key: #0b4a9e;
   --string: #0f766e;
@@ -49,6 +50,7 @@
     --focus: #8cb8ff;
     --service: #8cb8ff;
     --remote: #f5a54a;
+    --error: #ff8a80;
     --key: #8cb8ff;
     --string: #6fd3c4;
     --number: #b4a5ff;
@@ -66,6 +68,7 @@
   --focus: #8cb8ff;
   --service: #8cb8ff;
   --remote: #f5a54a;
+  --error: #ff8a80;
   --key: #8cb8ff;
   --string: #6fd3c4;
   --number: #b4a5ff;
@@ -161,6 +164,34 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* ---------- Page Data tab ---------- */
+
+/* One section per global. Its head stays pinned while its own tree scrolls under it,
+   then hands over to the next global's head. */
+.global + .global { margin-top: 20px; }
+.tree .global-head {
+  position: sticky;
+  top: -8px; /* .tree's top padding, so the pinned head sits flush with the edge */
+  z-index: 2;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  font-family: var(--sans);
+}
+.global-name {
+  font: 700 13px/1.3 var(--mono);
+  letter-spacing: -0.01em;
+}
+.global-meta { margin-left: auto; }
+.global > .summary { margin: 8px 0 2px; }
+.global > .summary .route { font-size: 13px; }
+.global-body { padding-top: 4px; }
+.global > .empty { padding: 8px 0 0 14px; }
+
 /* ---------- Version tab ---------- */
 
 .version {
@@ -251,6 +282,62 @@ body {
   word-break: break-all;
 }
 .assets li:hover .path { color: var(--ink); }
+
+/* ---------- API Fetch tab ---------- */
+
+.bad { color: var(--error); }
+.summary .bad { font-weight: 600; }
+
+/* One line per call, columns shared down the list: method, path, status, time. */
+.calls { border-top: 1px solid var(--rule); }
+.tree .call > summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.5em minmax(0, 1fr) auto 5.5em;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 4px 4px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.tree .call > summary::before { position: absolute; left: 2px; }
+.tree .call > summary:hover { background: var(--rule); }
+.call-method { color: var(--quiet); font-weight: 600; }
+.call-path { word-break: break-all; }
+.call-path strong { font-weight: 700; }
+.call-status { display: flex; flex-direction: column; align-items: flex-end; }
+.call-status .bad { font-weight: 700; }
+.call-code { font-size: 10px; }
+
+/* The open call: response first, then request and headers, closed. */
+.call-body {
+  padding: 8px 4px 14px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.call-error { margin-bottom: 8px; color: var(--error); font-family: var(--sans); }
+.call-part-head {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 2px;
+  font-family: var(--sans);
+}
+.call-part-name { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+.call-part-head .quiet { flex: 1; }
+.call-copy {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 11px var(--sans);
+  cursor: pointer;
+}
+.call-copy:hover { border-color: var(--band); }
+.call-copy.copied { background: var(--highlight); border-color: var(--highlight); color: var(--highlight-ink); }
+.call-more { margin-top: 10px; }
+.call-more > summary { font: 700 13px/1.6 var(--sans); letter-spacing: -0.01em; }
+.call-payload > .empty { padding: 4px 0; }
 
 /* ---------- Toolbar ---------- */
 

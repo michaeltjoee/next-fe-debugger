@@ -14,6 +14,16 @@ export interface AssetBundle {
   urls: string[];
 }
 
+/** What the API Fetch tab lists: the hook's calls, plus any the browser timed that the hook missed. */
+export interface GatewayResult {
+  /** False when the hook isn't in the page, e.g. the page was open before the extension loaded. */
+  recording: boolean;
+  session: number;
+  /** Hook version and timed-call count; changes whenever the list would. See gatewayStamp. */
+  stamp: string;
+  calls: GatewayCall[];
+}
+
 export interface NextDataResult {
   url: string;
   source: "window" | "script-tag" | null;
@@ -23,6 +33,7 @@ export interface NextDataResult {
   bundles: AssetBundle[];
   /** Remote asset URLs under `…/shared-components/…`; never counted as part of a service build. */
   shared: string[];
+  gateway: GatewayResult;
 }
 
 // Executed in the page's MAIN world (via inspectedWindow.eval or scripting.executeScript).
@@ -78,5 +89,55 @@ export function readNextData(): NextDataResult {
     core,
     bundles: [...bundles.values()],
     shared,
+    gateway: readGateway(),
   };
+
+  // Resource timing sees every fetch/XHR the page finished, even ones the hook missed
+  // (page open before the extension loaded, or a fetch saved before the hook wrapped it).
+  // It has no method or bodies, so those calls are listed as unrecorded.
+  function readGateway(): GatewayResult {
+    const log: GatewayLog | undefined = window.__MS_GATEWAY__;
+    const calls: GatewayCall[] = log ? JSON.parse(JSON.stringify(log.calls)) : [];
+    const timed = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
+      (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
+    );
+    const recorded = new Map<string, number>();
+    for (const c of calls) recorded.set(c.url, (recorded.get(c.url) ?? 0) + 1);
+    timed.forEach((e, i) => {
+      const left = recorded.get(e.name) ?? 0;
+      if (left) {
+        recorded.set(e.name, left - 1);
+        return;
+      }
+      calls.push({
+        id: -(i + 1),
+        via: e.initiatorType === "fetch" ? "fetch" : "xhr",
+        method: "",
+        url: e.name,
+        startedAt: e.startTime,
+        requestHeaders: {},
+        requestBody: null,
+        // 0 means the browser couldn't tell (e.g. cross-origin without timing access).
+        status: e.responseStatus || undefined,
+        size: e.decodedBodySize || undefined,
+        duration: e.duration,
+        unrecorded: true,
+      });
+    });
+    calls.sort((a, b) => a.startedAt - b.startedAt);
+    return {
+      recording: !!log,
+      session: log?.session ?? performance.timeOrigin,
+      stamp: `${log?.version ?? 0}:${timed.length}`,
+      calls,
+    };
+  }
+}
+
+/** The Gateway stamp alone, for cheap polling. Same counts as readGateway; self-contained like readNextData. */
+export function gatewayStamp(): string {
+  const timed = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
+    (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
+  );
+  return `${window.__MS_GATEWAY__?.version ?? 0}:${timed.length}`;
 }

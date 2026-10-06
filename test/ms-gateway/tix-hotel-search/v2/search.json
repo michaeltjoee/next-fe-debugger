@@ -1,0 +1,13 @@
+{
+  "code": "SUCCESS",
+  "message": "SUCCESS",
+  "data": {
+    "total": 2,
+    "hotels": [
+      { "id": 123, "name": "Hotel Example", "city": "Bali", "price": { "amount": 1250000, "currency": "IDR" }, "rating": 4.5 },
+      { "id": 456, "name": "Villa Sample", "city": "Bali", "price": { "amount": 2100000, "currency": "IDR" }, "rating": 4.8 }
+    ]
+  },
+  "errors": null,
+  "serverTime": 1791266400000
+}

@@ -1,4 +1,4 @@
-import { readNextData, type NextDataResult } from "../shared/read-next-data.js";
+import { gatewayStamp, readNextData, type NextDataResult } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
@@ -33,6 +33,7 @@ let watchTimer: ReturnType<typeof setInterval> | undefined;
 createTabStrip($("tabs"), out, SOURCES, active, (id) => {
   active = id;
   render();
+  if (id === "gateway") load({ quiet: true });
 });
 
 function evalInPage<T>(expr: string): Promise<T> {
@@ -47,7 +48,14 @@ function evalInPage<T>(expr: string): Promise<T> {
 async function load({ quiet = false } = {}): Promise<void> {
   try {
     const result = await evalInPage<NextDataResult>(`(${readNextData.toString()})()`);
-    const json = JSON.stringify([result.data, result.core, result.bundles, result.shared]);
+    const json = JSON.stringify([
+      result.data,
+      result.core,
+      result.bundles,
+      result.shared,
+      result.gateway.session,
+      result.gateway.stamp,
+    ]);
     if (quiet && json === lastJson) return;
     lastJson = json;
     current = result;
@@ -127,6 +135,14 @@ $("refresh").addEventListener("click", () => {
   menu.hidePopover();
   load();
 });
+
+// Gateway calls arrive while the page runs, so that tab follows them. Polls a cheap
+// stamp, and reads the calls themselves only when it moves.
+setInterval(async () => {
+  if (active !== "gateway" || !current) return;
+  const stamp = await evalInPage<string>(`(${gatewayStamp.toString()})()`).catch(() => null);
+  if (stamp !== null && stamp !== current.gateway.stamp) load({ quiet: true });
+}, 1000);
 
 // Full page navigations replace the document; re-read once it's loaded.
 chrome.devtools.network.onNavigated.addListener(() => setTimeout(load, 300));
