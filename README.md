@@ -13,7 +13,7 @@ Chrome extension (Manifest V3, TypeScript) for inspecting `window.__NEXT_DATA__`
 - **DevTools panel** (`__NEXT_DATA__` tab): collapsible JSON tree, filter by key/value, copy, auto-reload on navigation. The ⋯ menu holds **Show raw JSON**, **Watch for changes** (polls every second for client-side mutations; a yellow dot on ⋯ shows it's on), **Log to console** and **Reload data**. Follows the DevTools light/dark theme.
 - **Filtering expands matches**: every path to a match opens, and a matching key (e.g. `sessionData`) shows its whole subtree.
 - **Click a key** to copy its JS path (e.g. `__NEXT_DATA__.props.pageProps.hotel.rating` on Page Data, so it pastes straight into the console).
-- **Popup**: the same tabs with filter and Copy, for the active browser tab.
+- **Popup**: the same tabs with filter and Copy, for the active browser tab. Keyboard shortcuts open it straight on a tab (or switch tabs while it's open): **Alt+Shift+D** Version, **Alt+Shift+F** API Fetch, **Alt+Shift+G** Page Data, **Alt+Shift+H** dataLayer (**⌥⇧** on Mac). Change them at `chrome://extensions/shortcuts`. Needs Chrome 127+ (for `chrome.action.openPopup`).
 - **Badge**: toolbar icon shows `N` on pages that ship a `<script id="__NEXT_DATA__">`.
 - Detects **App Router** pages (no `__NEXT_DATA__`, uses `self.__next_f`) and says so.
 

@@ -16,11 +16,22 @@ const filter = $<HTMLInputElement>("filter");
 const copy = $<HTMLButtonElement>("copy");
 
 let current: NextDataResult | null = null;
-let active: SourceId = "version";
+let active: SourceId = sourceOf(new URLSearchParams(location.search).get("tab")) ?? "version";
 
-createTabStrip($("tabs"), out, SOURCES, active, (id) => {
+const selectTab = createTabStrip($("tabs"), out, SOURCES, active, (id) => {
   active = id;
   render();
+});
+
+// The keyboard shortcuts (see background.ts) open the popup as popup.html?tab=<id>; while it's
+// open, the same shortcuts switch tabs here.
+function sourceOf(id: string | null): SourceId | undefined {
+  return SOURCES.find((s) => s.id === id)?.id;
+}
+
+chrome.commands.onCommand.addListener((command) => {
+  const id = command.startsWith("open-") && sourceOf(command.slice("open-".length));
+  if (id) selectTab(id);
 });
 
 async function activeTabId(): Promise<number> {

@@ -1,12 +1,13 @@
 // Tab strip. The active tab is drawn by one paper-coloured "marker" that slides
 // between tabs and joins the tab to the content below, like a folder tab.
+// Returns a function that selects a tab, as if it were clicked.
 export function createTabStrip<Id extends string>(
   container: HTMLElement,
   panel: HTMLElement,
   specs: readonly { id: Id; label: string }[],
   initial: Id,
   onSelect: (id: Id) => void,
-): void {
+): (id: Id) => void {
   const marker = document.createElement("div");
   marker.className = "marker";
   marker.setAttribute("aria-hidden", "true");
@@ -72,4 +73,5 @@ export function createTabStrip<Id extends string>(
     requestAnimationFrame(() => strip.classList.add("ready"));
   });
   mark();
+  return (id) => select(id);
 }

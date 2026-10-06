@@ -39,6 +39,24 @@
       "32": "icons/idle32.png"
     }
   },
+  "commands": {
+    "open-version": {
+      "suggested_key": { "default": "Alt+Shift+D", "mac": "Alt+Shift+D" },
+      "description": "Open on the Version tab"
+    },
+    "open-gateway": {
+      "suggested_key": { "default": "Alt+Shift+F", "mac": "Alt+Shift+F" },
+      "description": "Open on the API Fetch tab"
+    },
+    "open-page": {
+      "suggested_key": { "default": "Alt+Shift+G", "mac": "Alt+Shift+G" },
+      "description": "Open on the Page Data tab"
+    },
+    "open-datalayer": {
+      "suggested_key": { "default": "Alt+Shift+H", "mac": "Alt+Shift+H" },
+      "description": "Open on the dataLayer tab"
+    }
+  },
   "devtools_page": "dist/devtools/devtools.html",
   "icons": {
     "16": "icons/icon16.png",

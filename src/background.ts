@@ -17,3 +17,20 @@ chrome.runtime.onMessage.addListener(
     });
   },
 );
+
+// Shortcuts (manifest "commands", named "open-<tab>") open the popup on that tab: point this
+// tab's popup at popup.html?tab=<id> just for this opening, then put it back. If the popup is
+// already open, openPopup fails and the popup switches tabs itself.
+const POPUP = "dist/popup/popup.html";
+
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (!command.startsWith("open-")) return;
+  const tabId = tab?.id;
+  try {
+    await chrome.action.setPopup({ tabId, popup: `${POPUP}?tab=${command.slice("open-".length)}` });
+    await chrome.action.openPopup();
+  } catch {
+  } finally {
+    chrome.action.setPopup({ tabId, popup: POPUP });
+  }
+});
