@@ -21,6 +21,13 @@ interface Window {
   __CORE_DATA__?: unknown;
   /** ms-gateway calls recorded by gateway-hook.ts; non-enumerable. */
   __MS_GATEWAY__?: GatewayLog;
+  /** Google Tag Manager / gtag.js event queue, shown on the dataLayer tab. */
+  dataLayer?: DataLayer;
+}
+
+interface DataLayer extends Array<unknown> {
+  /** How many entries the dataLayer tab's Clear hid; non-enumerable, set by clearDataLayer. */
+  __clearedAt?: number;
 }
 
 /** One browser-side call to …/ms-gateway/…. Response fields arrive once it settles. */

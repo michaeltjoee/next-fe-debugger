@@ -17,6 +17,7 @@
     <button id="mutate">Mutate window.__NEXT_DATA__ (test Watch)</button>
     <button id="login">Toggle logged-in sessionData (test Watch)</button>
     <button id="gateway">Call ms-gateway (test API Fetch tab)</button>
+    <button id="push">Push to dataLayer (test dataLayer tab)</button>
     <script id="__NEXT_DATA__" type="application/json">
       {
         "props": {
@@ -81,6 +82,20 @@
         xhr.send(JSON.stringify({ hotelId: 123, rooms: 1, checkIn: "2026-10-10" }));
       };
       gatewayCalls();
+      // dataLayer entries as GTM and gtag.js push them: plain objects, gtag()'s arguments
+      // objects, and a click event holding a DOM element (which can't go through JSON as is).
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
+      gtag("js", new Date());
+      gtag("config", "G-FIXTURE", { send_page_view: false });
+      dataLayer.push({ event: "pageView", pageType: "hotel_detail", hotelId: 123, currency: "IDR" });
+      let pushes = 0;
+      document.getElementById("push").onclick = (e) => {
+        pushes++;
+        dataLayer.push({ event: "gtm.click", "gtm.element": e.target, "gtm.elementId": e.target.id, clicks: pushes });
+        gtag("event", "add_to_cart", { items: [{ item_id: "hotel-123", quantity: pushes }], value: 1250000 });
+      };
       document.getElementById("gateway").onclick = gatewayCalls;
       document.getElementById("mutate").onclick = () => {
         window.__NEXT_DATA__.props.pageProps.hotel.rating = +(Math.random() * 5).toFixed(1);

@@ -1,14 +1,15 @@
 // What both the panel and the popup show: the deployed version, the page's
-// ms-gateway calls, and the page globals (__NEXT_DATA__ and __CORE_DATA__) together.
-import type { AssetBundle, GatewayResult, NextDataResult } from "./read-next-data.js";
+// ms-gateway calls, the page globals (__NEXT_DATA__ and __CORE_DATA__) together, and window.dataLayer.
+import type { AssetBundle, DataLayerResult, GatewayResult, NextDataResult } from "./read-next-data.js";
 import { emptyNote, flash, renderTree } from "./json-tree.js";
 
-export type SourceId = "version" | "gateway" | "page";
+export type SourceId = "version" | "gateway" | "page" | "datalayer";
 
 export const SOURCES: readonly { id: SourceId; label: string }[] = [
   { id: "version", label: "Version" },
   { id: "gateway", label: "API Fetch" },
   { id: "page", label: "Page Data" },
+  { id: "datalayer", label: "dataLayer" },
 ];
 
 type GlobalName = "__NEXT_DATA__" | "__CORE_DATA__";
@@ -29,6 +30,7 @@ export function valueOf(result: NextDataResult, id: SourceId): unknown {
     return bundles.length || shared.length ? { bundles, shared } : null;
   }
   if (id === "gateway") return result.gateway.calls.length ? result.gateway.calls : null;
+  if (id === "datalayer") return result.dataLayer.entries.length ? result.dataLayer.entries : null;
   const present = globalsOf(result).filter(([, value]) => value != null);
   return present.length ? Object.fromEntries(present) : null;
 }
@@ -57,6 +59,7 @@ export function hasToolbar(id: SourceId): boolean {
 export function logExpression(result: NextDataResult, id: SourceId): string {
   if (id === "version") return `console.log("Assets", ${JSON.stringify(valueOf(result, id))})`;
   if (id === "gateway") return `console.log("ms-gateway calls", window.__MS_GATEWAY__?.calls)`;
+  if (id === "datalayer") return `console.log("dataLayer", window.dataLayer?.slice(${result.dataLayer.start}))`;
   return `console.log({
     __NEXT_DATA__: window.__NEXT_DATA__ ?? JSON.parse(document.getElementById("__NEXT_DATA__")?.textContent ?? "null"),
     __CORE_DATA__: window.__CORE_DATA__,
@@ -67,11 +70,16 @@ export function renderBody(
   out: HTMLElement,
   result: NextDataResult,
   id: SourceId,
-  { filter, raw }: { filter: string; raw: boolean },
+  { filter, raw, onClear }: { filter: string; raw: boolean; onClear?: () => void },
 ): void {
   // Page Data always renders: each global says on its own when the page doesn't have it.
   if (id === "page") {
     renderPageData(out, result, { filter, raw });
+    return;
+  }
+  // So does dataLayer: once cleared it's empty but still has a Clear and a count to show.
+  if (id === "datalayer") {
+    renderDataLayer(out, result.dataLayer, { filter, raw, onClear });
     return;
   }
   if (valueOf(result, id) == null) {
@@ -200,7 +208,7 @@ function assetGroup(
   return group;
 }
 
-function missingMessage(result: NextDataResult, id: "version" | "gateway"): string {
+function missingMessage(result: NextDataResult, id: Exclude<SourceId, "page" | "datalayer">): string {
   if (id === "version") {
     return "No versioned or shared-component assets on this page. Looked for URLs shaped like …/<service>/v4.5.0/_next/… or …/shared-components/….";
   }
@@ -521,4 +529,234 @@ function payload(value: unknown, needle: string, raw: boolean, depth: number): H
     renderTree(host, value, { filter: needle, expandDepth: depth });
   }
   return host;
+}
+
+// ---------- dataLayer tab ----------
+
+/** Built rows by entry, reused across re-renders so polling doesn't collapse what the user opened. */
+const pushRows = new WeakMap<HTMLElement, Map<string, HTMLDetailsElement>>();
+/** Where the list ended last render (`session:index`), so rows past it are marked as just pushed. */
+const pushEnd = new WeakMap<HTMLElement, { session: number; end: number }>();
+/** Events the user opened. Kept apart from the DOM so a filter opening groups doesn't stick. */
+const openEvents = new WeakMap<HTMLElement, Set<string>>();
+
+/**
+ * dataLayer entries since the last Clear, grouped by event: one folded line per event with
+ * how many times it was pushed, in the order each event first fired, so groups don't move
+ * as pushes arrive. A group opens to its pushes in order; a push opens to its tree.
+ * Clear hides everything so far, so the next pushes stand alone.
+ */
+function renderDataLayer(
+  out: HTMLElement,
+  layer: DataLayerResult,
+  { filter, raw, onClear }: { filter: string; raw: boolean; onClear?: () => void },
+): void {
+  if (!layer.found) {
+    pushRows.delete(out);
+    pushEnd.delete(out);
+    out.replaceChildren(
+      emptyNote("This page has no window.dataLayer. It appears once Google Tag Manager or gtag.js loads, or the page pushes to it."),
+    );
+    return;
+  }
+  const needle = filter.trim().toLowerCase();
+  const previous = pushRows.get(out) ?? new Map<string, HTMLDetailsElement>();
+  const wasOpen = new Set([...previous.values()].filter((d) => d.open).map((d) => d.dataset.push));
+  const next = new Map<string, HTMLDetailsElement>();
+  const opened = openEvents.get(out) ?? new Set<string>();
+  openEvents.set(out, opened);
+  // Only pushes that arrive while the tab is showing count as new; the first read marks none.
+  const last = pushEnd.get(out);
+  const freshFrom = last?.session === layer.session ? last.end : Infinity;
+  pushEnd.set(out, { session: layer.session, end: layer.start + layer.entries.length });
+
+  const groups = new Map<string, { line: PushLine; rows: HTMLDetailsElement[]; fresh: boolean }>();
+  let shown = 0;
+  layer.entries.forEach((entry, i) => {
+    const index = layer.start + i;
+    const push = describePush(entry);
+    const lineMatches = !needle || `${push.command} ${push.name} ${push.keys}`.toLowerCase().includes(needle);
+    if (!lineMatches && !JSON.stringify(entry).toLowerCase().includes(needle)) return;
+    // Like the tree: a matching event shows the whole entry; otherwise the match is opened up inside.
+    const inner = lineMatches ? "" : needle;
+    const id = `${layer.session}:${index}`;
+    const key = [id, inner, raw].join("|");
+    const row = previous.get(key) ?? pushRow(entry, push, index, id, inner, raw, wasOpen.has(id) || !!inner);
+    next.set(key, row);
+    shown++;
+
+    const event = eventOf(push);
+    const group = groups.get(event.key) ?? { line: event.line, rows: [], fresh: false };
+    groups.set(event.key, group);
+    group.rows.push(row);
+    if (index >= freshFrom) {
+      group.fresh = true;
+      row.classList.add("fresh");
+    }
+  });
+  pushRows.set(out, next);
+
+  const list = el("div", "calls");
+  for (const [key, { line, rows, fresh }] of groups) {
+    list.append(eventGroup(key, line, rows, { open: !!needle || opened.has(key), fresh, opened }));
+  }
+  if (!groups.size) {
+    if (needle) list.append(emptyNote("No entries match the filter."));
+    else if (layer.start) list.append(emptyNote("Nothing pushed since Clear. Use the page, and what it pushes lists here."));
+    else list.append(emptyNote("window.dataLayer is empty."));
+  }
+  out.replaceChildren(dataLayerSummary(layer, shown, groups.size, !!needle, onClear), list);
+}
+
+function dataLayerSummary(
+  layer: DataLayerResult,
+  shown: number,
+  events: number,
+  filtered: boolean,
+  onClear?: () => void,
+): HTMLElement {
+  const line = el("div", "summary");
+  const total = layer.entries.length;
+  const count = `${total} ${total === 1 ? "entry" : "entries"}`;
+  line.append(el("span", "route", filtered ? `${shown} of ${count}` : count));
+  if (events) line.append(el("span", "", plural(events, "event")));
+  if (layer.start) {
+    const cleared = el("span", "", `${layer.start} cleared`);
+    cleared.title = "Hidden by Clear. They're still in window.dataLayer; reload the page to see them again.";
+    line.append(cleared);
+  }
+  if (onClear) {
+    const clear = el("button", "call-copy summary-action", "Clear");
+    clear.type = "button";
+    clear.title = "Hide the entries so far, so only new pushes show. The page's dataLayer isn't changed.";
+    clear.disabled = !total;
+    clear.addEventListener("click", onClear);
+    line.append(clear);
+  }
+  return line;
+}
+
+interface PushLine {
+  /** The gtag command when the entry is a gtag() call, e.g. `event` or `config`. */
+  command: string;
+  /** The event name, gtag target (`add_to_cart`, `G-XXXX`), or empty when the entry has none. */
+  name: string;
+  /** Google Tag Manager's own events (gtm.js, gtm.click, …), drawn quieter than the page's. */
+  builtin: boolean;
+  /** The entry's other keys, for a glance at what it carries. */
+  keys: string;
+}
+
+function describePush(entry: unknown): PushLine {
+  // gtag("event", "purchase", {...}) arrives as ["event", "purchase", {...}].
+  if (Array.isArray(entry)) {
+    const [command, target, params] = entry;
+    const keys = params !== null && typeof params === "object" ? Object.keys(params).join(", ") : "";
+    // gtag("js", new Date()) carries a timestamp, not a name.
+    if (typeof target === "string" && command !== "js") return { command: String(command), name: target, builtin: false, keys };
+    return { command: "", name: typeof command === "string" ? command : "gtag()", builtin: false, keys };
+  }
+  if (entry !== null && typeof entry === "object") {
+    const { event, ...rest } = entry as Record<string, unknown>;
+    const name = typeof event === "string" ? event : "";
+    return { command: "", name, builtin: name.startsWith("gtm."), keys: Object.keys(rest).join(", ") };
+  }
+  return { command: "", name: "", builtin: false, keys: JSON.stringify(entry) };
+}
+
+/**
+ * The group a push belongs to. gtag("event", "add_to_cart") joins dataLayer.push({ event: "add_to_cart" }),
+ * as GTM sees them as the same event; other gtag commands group by command and target (`config G-XXXX`).
+ */
+function eventOf(push: PushLine): { key: string; line: PushLine } {
+  if (push.command === "event") return { key: push.name, line: { ...push, command: "" } };
+  return { key: [push.command, push.name].filter(Boolean).join(" "), line: push };
+}
+
+/** The event as the group's headline: gtag command quiet, name bold, GTM's own events regular. */
+function eventLabel(push: PushLine): HTMLElement {
+  const label = el("span", "push-event");
+  if (push.command) label.append(el("span", "quiet", `${push.command} `));
+  if (push.name) label.append(el("strong", push.builtin ? "builtin" : "", push.name));
+  else if (!push.command) label.append(el("span", "quiet", "No event"));
+  label.title = push.builtin ? `${push.name}, built into Google Tag Manager` : label.textContent ?? "";
+  return label;
+}
+
+function eventGroup(
+  key: string,
+  line: PushLine,
+  rows: HTMLDetailsElement[],
+  { open, fresh, opened }: { open: boolean; fresh: boolean; opened: Set<string> },
+): HTMLDetailsElement {
+  const group = el("details", "event-group");
+  group.dataset.event = key;
+  group.open = open;
+  // An open group marks its new rows; a folded one marks itself, since its rows can't be seen.
+  if (fresh && !open) group.classList.add("fresh");
+  for (const row of rows) if (!open) row.classList.remove("fresh");
+
+  const head = el("summary");
+  head.append(eventLabel(line), el("span", "event-count num quiet", rows.length === 1 ? "1 push" : `${rows.length} pushes`));
+  group.addEventListener("animationend", (e) => {
+    if (e.target === head) group.classList.remove("fresh");
+  });
+  // Clicks (and Enter/Space) are the user's choice; a filter opening groups isn't remembered.
+  head.addEventListener("click", () => {
+    if (group.open) {
+      opened.delete(key);
+      return;
+    }
+    opened.add(key);
+    // A lone push is what the user came for; skip the second click.
+    if (rows.length === 1) rows[0]!.open = true;
+  });
+  group.append(head, ...rows);
+  return group;
+}
+
+function pushRow(
+  entry: unknown,
+  push: PushLine,
+  index: number,
+  id: string,
+  needle: string,
+  raw: boolean,
+  open: boolean,
+): HTMLDetailsElement {
+  const row = el("details", "call push");
+  row.dataset.push = id;
+  // The arrival mark plays once; re-renders move the row and would replay it.
+  row.addEventListener("animationend", () => row.classList.remove("fresh"));
+
+  const head = el("summary");
+  const keys = el("span", "push-keys quiet", push.keys || "No other keys");
+  keys.title = push.keys;
+  head.append(el("span", "push-index num quiet", String(index)), keys);
+  row.append(head);
+
+  const fill = () => {
+    if (row.dataset.filled) return;
+    row.dataset.filled = "1";
+    const body = el("div", "call-body");
+    const path = `dataLayer[${index}]`;
+    const top = el("div", "call-part-head");
+    const copy = el("button", "call-copy", "Copy");
+    copy.type = "button";
+    copy.title = `Copy ${path} as JSON`;
+    copy.addEventListener("click", () => {
+      navigator.clipboard.writeText(JSON.stringify(entry, null, 2));
+      flash(copy);
+    });
+    top.append(el("span", "call-part-name", path), el("span", "quiet"), copy);
+    const host = el("div", "call-payload");
+    if (raw || entry === null || typeof entry !== "object") host.append(el("pre", "raw", JSON.stringify(entry, null, 2)));
+    else renderTree(host, entry, { filter: needle, expandDepth: 2, rootPath: path, hideRoot: true });
+    body.append(top, host);
+    row.append(body);
+  };
+  row.open = open;
+  if (open) fill();
+  row.addEventListener("toggle", fill);
+  return row;
 }

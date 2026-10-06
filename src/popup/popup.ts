@@ -1,4 +1,4 @@
-import { readNextData, type NextDataResult } from "../shared/read-next-data.js";
+import { clearDataLayer, readNextData, type NextDataResult } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
@@ -23,12 +23,17 @@ createTabStrip($("tabs"), out, SOURCES, active, (id) => {
   render();
 });
 
-async function load(): Promise<void> {
+async function activeTabId(): Promise<number> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id == null) throw new Error("no active tab");
+  return tab.id;
+}
+
+async function load(): Promise<void> {
   try {
-    if (tab?.id == null) throw new Error("no active tab");
+    const tabId = await activeTabId();
     const [injection] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
+      target: { tabId },
       world: "MAIN",
       func: readNextData,
     });
@@ -47,7 +52,14 @@ function render(): void {
   if (!current) return;
   toolbar.hidden = !hasToolbar(active);
   copy.disabled = valueOf(current, active) == null;
-  renderBody(out, current, active, { filter: filter.value, raw: false });
+  renderBody(out, current, active, { filter: filter.value, raw: false, onClear });
+}
+
+async function onClear(): Promise<void> {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: await activeTabId() }, world: "MAIN", func: clearDataLayer });
+  } catch {}
+  load();
 }
 
 filter.addEventListener("input", render);

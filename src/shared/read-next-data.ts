@@ -24,6 +24,19 @@ export interface GatewayResult {
   calls: GatewayCall[];
 }
 
+/** What the dataLayer tab lists: window.dataLayer from the last Clear on. */
+export interface DataLayerResult {
+  /** False when the page has no window.dataLayer array. */
+  found: boolean;
+  session: number;
+  /** dataLayer index of the first entry in `entries`; the ones before it were cleared. */
+  start: number;
+  /** As JSON: gtag() calls (arguments objects) become arrays, DOM nodes and cycles become labels. */
+  entries: unknown[];
+  /** Length and clear point; changes whenever the list would. See dataLayerStamp. */
+  stamp: string;
+}
+
 export interface NextDataResult {
   url: string;
   source: "window" | "script-tag" | null;
@@ -34,6 +47,7 @@ export interface NextDataResult {
   /** Remote asset URLs under `…/shared-components/…`; never counted as part of a service build. */
   shared: string[];
   gateway: GatewayResult;
+  dataLayer: DataLayerResult;
 }
 
 // Executed in the page's MAIN world (via inspectedWindow.eval or scripting.executeScript).
@@ -90,7 +104,50 @@ export function readNextData(): NextDataResult {
     bundles: [...bundles.values()],
     shared,
     gateway: readGateway(),
+    dataLayer: readDataLayer(),
   };
+
+  function readDataLayer(): DataLayerResult {
+    const list = window.dataLayer;
+    const session = performance.timeOrigin;
+    if (!Array.isArray(list)) return { found: false, session, start: 0, entries: [], stamp: "" };
+    const start = Math.min(list.__clearedAt ?? 0, list.length);
+    return {
+      found: true,
+      session,
+      start,
+      entries: list.slice(start).map(toJson),
+      stamp: `${list.length}:${start}`,
+    };
+  }
+
+  // GTM puts the clicked element in gtm.element, and entries can hold anything the page
+  // pushed, so a plain JSON round trip can throw or walk the whole DOM.
+  function toJson(value: unknown): unknown {
+    const seen = new WeakSet<object>();
+    try {
+      const json = JSON.stringify(value, (_key, v: unknown) => {
+        if (typeof v === "function") return `[Function ${v.name || "anonymous"}]`;
+        if (v === window) return "[Window]";
+        if (v instanceof Element) {
+          const id = v.id ? `#${v.id}` : "";
+          const classes = [...v.classList].map((c) => `.${c}`).join("");
+          return `[${v.tagName.toLowerCase()}${id}${classes}]`;
+        }
+        if (v instanceof Node) return `[${v.nodeName}]`;
+        if (v !== null && typeof v === "object") {
+          if (seen.has(v)) return "[Seen above]";
+          seen.add(v);
+          // gtag() pushes its arguments object; show it as the call's argument list.
+          if (Object.prototype.toString.call(v) === "[object Arguments]") return Array.from(v as ArrayLike<unknown>);
+        }
+        return v;
+      });
+      return json === undefined ? null : JSON.parse(json);
+    } catch (err) {
+      return `[Can't show as JSON: ${err}]`;
+    }
+  }
 
   // Resource timing sees every fetch/XHR the page finished, even ones the hook missed
   // (page open before the extension loaded, or a fetch saved before the hook wrapped it).
@@ -140,4 +197,21 @@ export function gatewayStamp(): string {
     (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
   );
   return `${window.__MS_GATEWAY__?.version ?? 0}:${timed.length}`;
+}
+
+/** The dataLayer stamp alone, for cheap polling. Same as readDataLayer's; self-contained like readNextData. */
+export function dataLayerStamp(): string {
+  const list = window.dataLayer;
+  return Array.isArray(list) ? `${list.length}:${Math.min(list.__clearedAt ?? 0, list.length)}` : "";
+}
+
+/**
+ * The dataLayer tab's Clear: hides the entries so far by marking where the tab starts.
+ * The page's dataLayer is left as is, so GTM and the page's own code never notice.
+ * Self-contained like readNextData.
+ */
+export function clearDataLayer(): void {
+  const list = window.dataLayer;
+  if (!Array.isArray(list)) return;
+  Object.defineProperty(list, "__clearedAt", { value: list.length, writable: true, configurable: true });
 }

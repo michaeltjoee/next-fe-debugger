@@ -1,4 +1,10 @@
-import { gatewayStamp, readNextData, type NextDataResult } from "../shared/read-next-data.js";
+import {
+  clearDataLayer,
+  dataLayerStamp,
+  gatewayStamp,
+  readNextData,
+  type NextDataResult,
+} from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
@@ -33,7 +39,7 @@ let watchTimer: ReturnType<typeof setInterval> | undefined;
 createTabStrip($("tabs"), out, SOURCES, active, (id) => {
   active = id;
   render();
-  if (id === "gateway") load({ quiet: true });
+  if (id === "gateway" || id === "datalayer") load({ quiet: true });
 });
 
 function evalInPage<T>(expr: string): Promise<T> {
@@ -55,6 +61,8 @@ async function load({ quiet = false } = {}): Promise<void> {
       result.shared,
       result.gateway.session,
       result.gateway.stamp,
+      result.dataLayer.session,
+      result.dataLayer.stamp,
     ]);
     if (quiet && json === lastJson) return;
     lastJson = json;
@@ -73,7 +81,12 @@ function render(): void {
   if (!current) return;
   toolbar.hidden = !hasToolbar(active);
   copy.disabled = valueOf(current, active) == null;
-  renderBody(out, current, active, { filter: filter.value, raw });
+  renderBody(out, current, active, { filter: filter.value, raw, onClear });
+}
+
+async function onClear(): Promise<void> {
+  await evalInPage(`(${clearDataLayer.toString()})()`).catch(() => {});
+  load();
 }
 
 /** Menu toggles: flip the item's check and return the new state. */
@@ -136,12 +149,19 @@ $("refresh").addEventListener("click", () => {
   load();
 });
 
-// Gateway calls arrive while the page runs, so that tab follows them. Polls a cheap
-// stamp, and reads the calls themselves only when it moves.
+// Gateway calls and dataLayer pushes arrive while the page runs, so those tabs follow them.
+// Polls a cheap stamp, and reads the data itself only when it moves.
 setInterval(async () => {
-  if (active !== "gateway" || !current) return;
-  const stamp = await evalInPage<string>(`(${gatewayStamp.toString()})()`).catch(() => null);
-  if (stamp !== null && stamp !== current.gateway.stamp) load({ quiet: true });
+  if (!current) return;
+  const [read, seen] =
+    active === "gateway"
+      ? [gatewayStamp, current.gateway.stamp]
+      : active === "datalayer"
+        ? [dataLayerStamp, current.dataLayer.stamp]
+        : [];
+  if (!read) return;
+  const stamp = await evalInPage<string>(`(${read.toString()})()`).catch(() => null);
+  if (stamp !== null && stamp !== seen) load({ quiet: true });
 }, 1000);
 
 // Full page navigations replace the document; re-read once it's loaded.

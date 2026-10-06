@@ -339,6 +339,59 @@ body {
 .call-more > summary { font: 700 13px/1.6 var(--sans); letter-spacing: -0.01em; }
 .call-payload > .empty { padding: 4px 0; }
 
+/* ---------- dataLayer tab ---------- */
+
+/* One folded line per event with its push count; open, its pushes in order, indented under it.
+   Rows share the API Fetch list's look. */
+.summary .summary-action { margin-left: auto; align-self: center; }
+.call-copy:disabled { opacity: 0.5; cursor: default; }
+.call-copy:disabled:hover { border-color: var(--rule); }
+.tree .event-group > summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 5px 4px 5px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.tree .event-group > summary::before { position: absolute; left: 2px; }
+.tree .event-group > summary:hover { background: var(--rule); }
+.tree .event-group .push > summary { grid-template-columns: 2.5em minmax(0, 1fr); padding-left: 32px; }
+.tree .event-group .push > summary::before { left: 18px; }
+.event-group .call-body { padding-left: 32px; }
+.push-index { text-align: right; }
+.push-event,
+.push-keys { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.push-event strong { font-weight: 700; }
+/* GTM's own lifecycle events are context, not what the page pushed. */
+.push-event .builtin { font-weight: 400; }
+
+/* The one moving thing: pushes that arrive while you watch get a yellow edge that fades,
+   so it's clear what the last click on the page pushed. */
+.tree .push.fresh > summary,
+.tree .event-group.fresh > summary { animation: pushed 2.4s ease-out; }
+@keyframes pushed {
+  from {
+    background: color-mix(in srgb, var(--highlight) 28%, transparent);
+    box-shadow: inset 3px 0 var(--highlight);
+  }
+  40% { box-shadow: inset 3px 0 var(--highlight); }
+  to {
+    background: transparent;
+    box-shadow: inset 3px 0 transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Same mark, held still, then gone: no fade, but the row still stops reading as new. */
+  .tree .push.fresh > summary,
+  .tree .event-group.fresh > summary { animation: pushed-still 2.4s steps(1, end); }
+}
+@keyframes pushed-still {
+  from { box-shadow: inset 3px 0 var(--highlight); }
+  to { box-shadow: none; }
+}
+
 /* ---------- Toolbar ---------- */
 
 .toolbar {
