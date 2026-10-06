@@ -6,19 +6,19 @@
   </head>
   <body class="shell">
     <header id="tabs" class="band"></header>
-    <div id="status" class="status"></div>
     <div id="toolbar" class="toolbar" hidden>
       <input id="filter" type="search" placeholder="Filter keys and values" aria-label="Filter keys and values" />
-      <div class="seg" role="group" aria-label="View">
-        <button id="view-tree" type="button" aria-pressed="true">Tree</button>
-        <button id="view-raw" type="button" aria-pressed="false">JSON</button>
-      </div>
       <button id="copy" type="button" title="Copy this tab's JSON">Copy</button>
-      <button id="log" type="button" title="console.log this tab's data in the page">Log</button>
-      <label class="check" title="Re-read every second and update when the data changes">
-        <input id="watch" type="checkbox" /> Watch
-      </label>
-      <button id="refresh" type="button" title="Read the data from the page again">Refresh</button>
+      <button id="more" class="more" type="button" popovertarget="menu" aria-haspopup="menu" aria-label="More actions" title="More actions">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
+      </button>
+    </div>
+    <div id="menu" class="menu" popover role="menu" aria-label="More actions">
+      <button id="raw" type="button" role="menuitemcheckbox" aria-checked="false">Show raw JSON</button>
+      <button id="watch" type="button" role="menuitemcheckbox" aria-checked="false" title="Re-read every second and update when the data changes">Watch for changes</button>
+      <hr />
+      <button id="log" type="button" role="menuitem" title="console.log this tab's data in the page">Log to console</button>
+      <button id="refresh" type="button" role="menuitem" title="Read the data from the page again">Reload data</button>
     </div>
     <main id="out" class="out tree"></main>
     <script type="module" src="panel.js"></script>

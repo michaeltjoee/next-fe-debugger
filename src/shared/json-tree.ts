@@ -120,7 +120,7 @@ function buildNode(
   return row;
 }
 
-function flash(el: HTMLElement): void {
+export function flash(el: HTMLElement): void {
   el.classList.add("copied");
   setTimeout(() => el.classList.remove("copied"), 600);
 }

@@ -2,10 +2,9 @@ import { readNextData, type NextDataResult } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
+  hasToolbar,
   logExpression,
   renderBody,
-  renderStatus,
-  tabStubs,
   valueOf,
   type SourceId,
 } from "../shared/inspector.js";
@@ -13,13 +12,13 @@ import { createTabStrip } from "../shared/tabs.js";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const out = $<HTMLElement>("out");
-const status = $<HTMLElement>("status");
 const toolbar = $<HTMLDivElement>("toolbar");
 const filter = $<HTMLInputElement>("filter");
-const viewTree = $<HTMLButtonElement>("view-tree");
-const viewRaw = $<HTMLButtonElement>("view-raw");
 const copy = $<HTMLButtonElement>("copy");
-const log = $<HTMLButtonElement>("log");
+const more = $<HTMLButtonElement>("more");
+const menu = $<HTMLDivElement>("menu");
+const rawItem = $<HTMLButtonElement>("raw");
+const watchItem = $<HTMLButtonElement>("watch");
 
 // Match the DevTools theme, which can differ from the OS one.
 document.documentElement.dataset.theme =
@@ -31,7 +30,7 @@ let active: SourceId = "version";
 let raw = false;
 let watchTimer: ReturnType<typeof setInterval> | undefined;
 
-const tabs = createTabStrip($("tabs"), out, SOURCES, active, (id) => {
+createTabStrip($("tabs"), out, SOURCES, active, (id) => {
   active = id;
   render();
 });
@@ -48,7 +47,7 @@ function evalInPage<T>(expr: string): Promise<T> {
 async function load({ quiet = false } = {}): Promise<void> {
   try {
     const result = await evalInPage<NextDataResult>(`(${readNextData.toString()})()`);
-    const json = JSON.stringify([result.data, result.core, result.bundles]);
+    const json = JSON.stringify([result.data, result.core, result.bundles, result.shared]);
     if (quiet && json === lastJson) return;
     lastJson = json;
     current = result;
@@ -56,32 +55,27 @@ async function load({ quiet = false } = {}): Promise<void> {
     current = null;
     lastJson = "";
     toolbar.hidden = true;
-    status.replaceChildren();
     out.replaceChildren(emptyNote(`Can't read this page: ${err}`));
     return;
   }
-  toolbar.hidden = false;
-  renderStatus(status, current);
-  tabs.setStubs(tabStubs(current));
   render();
 }
 
 function render(): void {
   if (!current) return;
-  copy.disabled = log.disabled = valueOf(current, active) == null;
+  toolbar.hidden = !hasToolbar(active);
+  copy.disabled = valueOf(current, active) == null;
   renderBody(out, current, active, { filter: filter.value, raw });
 }
 
-function setRaw(value: boolean): void {
-  raw = value;
-  viewTree.setAttribute("aria-pressed", String(!raw));
-  viewRaw.setAttribute("aria-pressed", String(raw));
-  render();
+/** Menu toggles: flip the item's check and return the new state. */
+function toggle(item: HTMLButtonElement): boolean {
+  const on = item.getAttribute("aria-checked") !== "true";
+  item.setAttribute("aria-checked", String(on));
+  return on;
 }
 
 filter.addEventListener("input", render);
-viewTree.addEventListener("click", () => setRaw(false));
-viewRaw.addEventListener("click", () => setRaw(true));
 
 copy.addEventListener("click", async () => {
   const value = current && valueOf(current, active);
@@ -91,18 +85,48 @@ copy.addEventListener("click", async () => {
   setTimeout(() => (copy.textContent = "Copy"), 1200);
 });
 
-log.addEventListener("click", () => {
+// Open the menu under the ⋯ button, right edges aligned, and focus its first item.
+menu.addEventListener("beforetoggle", (e) => {
+  if ((e as ToggleEvent).newState !== "open") return;
+  const r = more.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 4}px`;
+  menu.style.right = `${document.documentElement.clientWidth - r.right}px`;
+});
+menu.addEventListener("toggle", (e) => {
+  more.setAttribute("aria-expanded", String((e as ToggleEvent).newState === "open"));
+  if ((e as ToggleEvent).newState === "open") menu.querySelector("button")!.focus();
+});
+menu.addEventListener("keydown", (e) => {
+  const items = [...menu.querySelectorAll("button")];
+  const i = items.indexOf(document.activeElement as HTMLButtonElement);
+  const next = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  items[(next + items.length) % items.length]!.focus();
+});
+
+rawItem.addEventListener("click", () => {
+  raw = toggle(rawItem);
+  render();
+});
+
+watchItem.addEventListener("click", () => {
+  const on = toggle(watchItem);
+  more.classList.toggle("watching", on);
+  more.title = on ? "More actions (watching for changes)" : "More actions";
+  clearInterval(watchTimer);
+  if (on) watchTimer = setInterval(() => load({ quiet: true }), 1000);
+});
+
+$("log").addEventListener("click", () => {
+  menu.hidePopover();
   if (current) evalInPage(logExpression(current, active));
 });
 
-$<HTMLInputElement>("watch").addEventListener("change", (e) => {
-  clearInterval(watchTimer);
-  if ((e.target as HTMLInputElement).checked) {
-    watchTimer = setInterval(() => load({ quiet: true }), 1000);
-  }
+$("refresh").addEventListener("click", () => {
+  menu.hidePopover();
+  load();
 });
-
-$("refresh").addEventListener("click", () => load());
 
 // Full page navigations replace the document; re-read once it's loaded.
 chrome.devtools.network.onNavigated.addListener(() => setTimeout(load, 300));

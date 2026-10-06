@@ -21,6 +21,8 @@ export interface NextDataResult {
   data: NextData | null;
   core: CoreDataResult;
   bundles: AssetBundle[];
+  /** Remote asset URLs under `…/shared-components/…`; never counted as part of a service build. */
+  shared: string[];
 }
 
 // Executed in the page's MAIN world (via inspectedWindow.eval or scripting.executeScript).
@@ -53,7 +55,12 @@ export function readNextData(): NextDataResult {
   });
   for (const entry of performance.getEntriesByType("resource")) urls.add(entry.name);
   const bundles = new Map<string, AssetBundle>();
+  const shared: string[] = [];
   for (const url of urls) {
+    if (url.includes("/shared-components/")) {
+      shared.push(url);
+      continue;
+    }
     const m = url.match(/^(https?:\/\/[^/]+)\/(?:(.*?)\/)?(v?\d+(?:\.\d+)+[\w.-]*)\/_next\//);
     if (!m) continue;
     const [, origin = "", service = "", version = ""] = m;
@@ -70,5 +77,6 @@ export function readNextData(): NextDataResult {
     data: data ? JSON.parse(JSON.stringify(data)) : null,
     core,
     bundles: [...bundles.values()],
+    shared,
   };
 }

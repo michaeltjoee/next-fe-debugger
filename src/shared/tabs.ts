@@ -1,20 +1,15 @@
-// Tab strip. The active tab is drawn by one "ticket" element that slides
-// between tabs; the yellow stub holds a short fact about the tab (version, size).
-export interface TabStrip<Id extends string> {
-  /** Text on each tab's yellow stub. */
-  setStubs(stubs: Record<Id, string>): void;
-}
-
+// Tab strip. The active tab is drawn by one paper-coloured "marker" that slides
+// between tabs and joins the tab to the content below, like a folder tab.
 export function createTabStrip<Id extends string>(
   container: HTMLElement,
   panel: HTMLElement,
   specs: readonly { id: Id; label: string }[],
   initial: Id,
   onSelect: (id: Id) => void,
-): TabStrip<Id> {
-  const ticket = document.createElement("div");
-  ticket.className = "ticket";
-  ticket.setAttribute("aria-hidden", "true");
+): void {
+  const marker = document.createElement("div");
+  marker.className = "marker";
+  marker.setAttribute("aria-hidden", "true");
 
   const strip = document.createElement("div");
   strip.className = "tabs";
@@ -26,19 +21,14 @@ export function createTabStrip<Id extends string>(
     tab.type = "button";
     tab.id = `tab-${id}`;
     tab.dataset.id = id;
+    tab.textContent = label;
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-controls", panel.id);
-    const name = document.createElement("span");
-    name.className = "tab-name";
-    name.textContent = label;
-    const size = document.createElement("span");
-    size.className = "tab-size";
-    tab.append(name, size);
     tab.addEventListener("click", () => select(id));
     return tab;
   });
 
-  strip.append(ticket, ...tabs);
+  strip.append(marker, ...tabs);
   container.replaceChildren(strip);
   panel.setAttribute("role", "tabpanel");
 
@@ -46,10 +36,8 @@ export function createTabStrip<Id extends string>(
 
   function place(): void {
     const tab = tabs.find((t) => t.dataset.id === active)!;
-    const size = tab.querySelector<HTMLElement>(".tab-size")!;
-    ticket.style.width = `${tab.offsetWidth}px`;
-    ticket.style.transform = `translateX(${tab.offsetLeft}px)`;
-    ticket.style.setProperty("--perf", `${size.offsetLeft}px`);
+    marker.style.width = `${tab.offsetWidth}px`;
+    marker.style.transform = `translateX(${tab.offsetLeft}px)`;
   }
 
   function mark(focus = false): void {
@@ -77,20 +65,11 @@ export function createTabStrip<Id extends string>(
     select(specs[(next + specs.length) % specs.length]!.id, true);
   });
 
-  // Widths change with sizes, fonts and window size; only animate once laid out.
+  // Widths change with fonts and window size; only animate once laid out.
   new ResizeObserver(place).observe(strip);
   document.fonts.ready.then(() => {
     place();
     requestAnimationFrame(() => strip.classList.add("ready"));
   });
   mark();
-
-  return {
-    setStubs(stubs) {
-      for (const tab of tabs) {
-        tab.querySelector(".tab-size")!.textContent = stubs[tab.dataset.id as Id];
-      }
-      place();
-    },
-  };
 }
