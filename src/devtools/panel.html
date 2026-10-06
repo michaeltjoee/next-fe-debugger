@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../shared/tree.css" />
+  </head>
+  <body>
+    <div class="toolbar">
+      <button id="refresh" title="Re-read from the page">Refresh</button>
+      <input id="filter" type="search" placeholder="Filter keys / values…" />
+      <select id="view" title="View">
+        <option value="tree">Tree</option>
+        <option value="raw">Raw JSON</option>
+      </select>
+      <button id="copy" title="Copy full JSON">Copy</button>
+      <button id="log" title="console.log in the page">Log</button>
+      <label title="Poll every second and re-render when the value changes">
+        <input id="watch" type="checkbox" /> Watch
+      </label>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="out" class="tree"></div>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

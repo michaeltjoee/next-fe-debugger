@@ -1,0 +1,78 @@
+:root {
+  --bg: #fff;
+  --fg: #1f1f1f;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --key: #881391;
+  --string: #c41a16;
+  --number: #1c00cf;
+  --boolean: #0d22aa;
+  --null: #808080;
+  --accent: #2563eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #202124;
+    --fg: #e8eaed;
+    --muted: #9aa0a6;
+    --border: #3c4043;
+    --key: #c792ea;
+    --string: #f28b54;
+    --number: #9980ff;
+    --boolean: #9980ff;
+    --null: #9aa0a6;
+    --accent: #8ab4f8;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px/1.5 system-ui, -apple-system, sans-serif;
+}
+
+.tree {
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 8px 12px;
+  overflow: auto;
+}
+.tree details > summary { cursor: pointer; list-style: none; }
+.tree details > summary::before { content: "▸ "; color: var(--muted); }
+.tree details[open] > summary::before { content: "▾ "; }
+.tree .children { padding-left: 16px; border-left: 1px solid var(--border); margin-left: 4px; }
+.tree .leaf { padding-left: 14px; white-space: pre-wrap; word-break: break-all; }
+.tree .key { color: var(--key); cursor: copy; }
+.tree .key.copied { background: var(--accent); color: var(--bg); border-radius: 2px; }
+.tree .meta { color: var(--muted); }
+.tree .val.string { color: var(--string); }
+.tree .val.number { color: var(--number); }
+.tree .val.boolean { color: var(--boolean); }
+.tree .val.null { color: var(--null); }
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+.toolbar input[type="search"] { flex: 1; min-width: 0; }
+.toolbar input, .toolbar button, .toolbar select {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+.toolbar button { cursor: pointer; }
+.toolbar button:hover { border-color: var(--accent); }
+
+.status { color: var(--muted); padding: 4px 12px; border-bottom: 1px solid var(--border); }
+.status b { color: var(--fg); font-weight: 600; }
+.empty { padding: 16px 12px; color: var(--muted); }
+pre.raw { margin: 0; padding: 8px 12px; white-space: pre-wrap; word-break: break-all; font: 12px/1.5 ui-monospace, Menlo, monospace; }

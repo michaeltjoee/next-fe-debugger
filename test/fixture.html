@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Fake Next.js (Pages Router) page for manually testing the extension.
+     Serve it over http (content scripts don't run on file:// by default):
+       npx serve test   or   python3 -m http.server -d test 8080 -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Next Data fixture</title>
+  </head>
+  <body>
+    <div id="__next">Fixture page — open DevTools → __NEXT_DATA__ tab.</div>
+    <button id="mutate">Mutate window.__NEXT_DATA__ (test Watch)</button>
+    <script id="__NEXT_DATA__" type="application/json">
+      {
+        "props": {
+          "pageProps": {
+            "hotel": { "id": 123, "name": "Hotel Example", "rating": 4.5, "tags": ["pool", "wifi"], "promo": null },
+            "user-agent": "fixture",
+            "isMobile": false
+          },
+          "__N_SSP": true
+        },
+        "page": "/hotel/[slug]",
+        "query": { "slug": "hotel-example" },
+        "buildId": "dev-fixture",
+        "isFallback": false,
+        "gssp": true,
+        "scriptLoader": []
+      }
+    </script>
+    <script>
+      window.__NEXT_DATA__ = JSON.parse(document.getElementById("__NEXT_DATA__").textContent);
+      document.getElementById("mutate").onclick = () => {
+        window.__NEXT_DATA__.props.pageProps.hotel.rating = +(Math.random() * 5).toFixed(1);
+      };
+    </script>
+  </body>
+</html>

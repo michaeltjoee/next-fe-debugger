@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Next Data Debugger",
+  "version": "0.1.0",
+  "description": "Inspect window.__NEXT_DATA__ on Next.js (Pages Router) sites.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dist/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Next Data Debugger",
+    "default_popup": "dist/popup/popup.html"
+  },
+  "devtools_page": "dist/devtools/devtools.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
