@@ -14,7 +14,7 @@ export interface AssetBundle {
   urls: string[];
 }
 
-/** What the API Fetch tab lists: the hook's calls, plus any the browser timed that the hook missed. */
+/** What the API Fetch tab lists from the last Clear on: the hook's calls, plus any the browser timed that the hook missed. */
 export interface GatewayResult {
   /** False when the hook isn't in the page, e.g. the page was open before the extension loaded. */
   recording: boolean;
@@ -22,7 +22,9 @@ export interface GatewayResult {
   /** Hook version and timed-call count; changes whenever the list would. See gatewayStamp. */
   stamp: string;
   calls: GatewayCall[];
-  /** Paths left out of `calls` on purpose, with how many times the browser timed each. */
+  /** How many calls started before the last Clear, so aren't in `calls`. */
+  cleared: number;
+  /** Paths left out of `calls` on purpose, with how many times the browser timed each since Clear. */
   ignored: { path: string; count: number }[];
 }
 
@@ -161,12 +163,13 @@ export function readNextData(): NextDataResult {
     const ignored = ["tix-inbox/userInbox/unreadCount", "tix-chat-platform/v1/users/unread_count"].map(
       (path) => ({ path, count: 0 }),
     );
+    const clearedAt = window.__MS_GATEWAY_CLEARED_AT__ ?? 0;
     const all = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
       (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
     );
     const timed = all.filter((e) => {
       const match = ignored.find((i) => new URL(e.name).pathname.includes(i.path));
-      if (match) match.count++;
+      if (match && e.startTime >= clearedAt) match.count++;
       return !match;
     });
     const recorded = new Map<string, number>();
@@ -193,12 +196,15 @@ export function readNextData(): NextDataResult {
       });
     });
     calls.sort((a, b) => a.startedAt - b.startedAt);
+    // Matched first, so a call from before Clear still claims its timing entry and never shows as unrecorded.
+    const since = calls.filter((c) => c.startedAt >= clearedAt);
     return {
       recording: !!log,
       session: log?.session ?? performance.timeOrigin,
       // Counts ignored calls too, so their counts stay current.
-      stamp: `${log?.version ?? 0}:${all.length}`,
-      calls,
+      stamp: `${log?.version ?? 0}:${all.length}:${clearedAt}`,
+      calls: since,
+      cleared: calls.length - since.length,
       ignored,
     };
   }
@@ -209,7 +215,16 @@ export function gatewayStamp(): string {
   const timed = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
     (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
   );
-  return `${window.__MS_GATEWAY__?.version ?? 0}:${timed.length}`;
+  return `${window.__MS_GATEWAY__?.version ?? 0}:${timed.length}:${window.__MS_GATEWAY_CLEARED_AT__ ?? 0}`;
+}
+
+/**
+ * The API Fetch tab's Clear: hides the calls so far by marking when the tab starts.
+ * Calls are left as they are, in the hook's log and the browser's timing; a page reload shows only new ones anyway.
+ * Self-contained like readNextData.
+ */
+export function clearGateway(): void {
+  Object.defineProperty(window, "__MS_GATEWAY_CLEARED_AT__", { value: performance.now(), writable: true, configurable: true });
 }
 
 /** The dataLayer stamp alone, for cheap polling. Same as readDataLayer's; self-contained like readNextData. */

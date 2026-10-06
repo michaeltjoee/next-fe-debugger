@@ -1,4 +1,4 @@
-import { clearDataLayer, readNextData, type NextDataResult } from "../shared/read-next-data.js";
+import { clearDataLayer, clearGateway, readNextData, type NextDataResult } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
@@ -66,9 +66,11 @@ function render(): void {
   renderBody(out, current, active, { filter: filter.value, raw: false, onClear });
 }
 
+/** Clear on the API Fetch or dataLayer tab, whichever is showing. */
 async function onClear(): Promise<void> {
+  const func = active === "gateway" ? clearGateway : clearDataLayer;
   try {
-    await chrome.scripting.executeScript({ target: { tabId: await activeTabId() }, world: "MAIN", func: clearDataLayer });
+    await chrome.scripting.executeScript({ target: { tabId: await activeTabId() }, world: "MAIN", func });
   } catch {}
   load();
 }

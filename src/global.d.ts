@@ -21,6 +21,8 @@ interface Window {
   __CORE_DATA__?: unknown;
   /** ms-gateway calls recorded by gateway-hook.ts; non-enumerable. */
   __MS_GATEWAY__?: GatewayLog;
+  /** performance.now() of the API Fetch tab's last Clear; non-enumerable, set by clearGateway. */
+  __MS_GATEWAY_CLEARED_AT__?: number;
   /** Google Tag Manager / gtag.js event queue, shown on the dataLayer tab. */
   dataLayer?: DataLayer;
 }

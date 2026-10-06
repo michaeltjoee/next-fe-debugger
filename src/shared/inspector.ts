@@ -58,7 +58,9 @@ export function hasToolbar(id: SourceId): boolean {
 /** Page expression that logs the active tab; __NEXT_DATA__ falls back to the script tag like readNextData does. */
 export function logExpression(result: NextDataResult, id: SourceId): string {
   if (id === "version") return `console.log("Assets", ${JSON.stringify(valueOf(result, id))})`;
-  if (id === "gateway") return `console.log("ms-gateway calls", window.__MS_GATEWAY__?.calls)`;
+  if (id === "gateway") {
+    return `console.log("ms-gateway calls", window.__MS_GATEWAY__?.calls.filter((c) => c.startedAt >= (window.__MS_GATEWAY_CLEARED_AT__ ?? 0)))`;
+  }
   if (id === "datalayer") return `console.log("dataLayer", window.dataLayer?.slice(${result.dataLayer.start}))`;
   return `console.log({
     __NEXT_DATA__: window.__NEXT_DATA__ ?? JSON.parse(document.getElementById("__NEXT_DATA__")?.textContent ?? "null"),
@@ -82,14 +84,15 @@ export function renderBody(
     renderDataLayer(out, result.dataLayer, { filter, raw, onClear });
     return;
   }
-  if (valueOf(result, id) == null) {
+  // Once cleared, API Fetch keeps its summary (count, Clear) even with nothing new yet.
+  if (valueOf(result, id) == null && !(id === "gateway" && result.gateway.cleared)) {
     const open = isIgnoredOpen(out);
     out.replaceChildren(emptyNote(missingMessage(result, id)));
     if (id === "gateway" && result.gateway.ignored.length) out.append(ignoredPaths(result.gateway.ignored, open));
     return;
   }
   if (id === "version") renderVersion(out, result);
-  else renderGateway(out, result.gateway, { filter, raw });
+  else renderGateway(out, result.gateway, { filter, raw, onClear });
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -333,13 +336,13 @@ function missingGlobal(result: NextDataResult, name: GlobalName): string {
 const callRows = new WeakMap<HTMLElement, Map<string, HTMLDetailsElement>>();
 
 /**
- * Every ms-gateway call in the order the page made it, one line each: method, path, status, time.
- * A row opens to the response; the request and response headers sit below it.
+ * Every ms-gateway call since the last Clear in the order the page made it, one line each:
+ * method, path, status, time. A row opens to the response; the request and response headers sit below it.
  */
 function renderGateway(
   out: HTMLElement,
   log: GatewayResult,
-  { filter, raw }: { filter: string; raw: boolean },
+  { filter, raw, onClear }: { filter: string; raw: boolean; onClear?: () => void },
 ): void {
   const needle = filter.trim().toLowerCase();
   const previous = callRows.get(out) ?? new Map<string, HTMLDetailsElement>();
@@ -364,8 +367,9 @@ function renderGateway(
   const rows = [...next.values()];
   const list = el("div", "calls");
   if (rows.length) list.append(...rows);
-  else list.append(emptyNote("No calls match the filter."));
-  const parts: HTMLElement[] = [gatewaySummary(log.calls, rows.length, !!needle)];
+  else if (needle) list.append(emptyNote("No calls match the filter."));
+  else list.append(emptyNote("No calls since Clear. Use the page, and the calls it makes list here."));
+  const parts: HTMLElement[] = [gatewaySummary(log, rows.length, !!needle, onClear)];
   if (!log.recording) {
     parts.push(emptyNote("Not recording on this page, so these calls have no bodies. Reload the page to record them."));
   }
@@ -397,7 +401,8 @@ function ignoredPaths(ignored: GatewayResult["ignored"], open: boolean): HTMLDet
   return group;
 }
 
-function gatewaySummary(calls: GatewayCall[], shown: number, filtered: boolean): HTMLElement {
+function gatewaySummary(log: GatewayResult, shown: number, filtered: boolean, onClear?: () => void): HTMLElement {
+  const { calls } = log;
   const line = el("div", "summary");
   const count = filtered ? `${shown} of ${plural(calls.length, "call")}` : plural(calls.length, "call");
   line.append(el("span", "route", count));
@@ -411,9 +416,24 @@ function gatewaySummary(calls: GatewayCall[], shown: number, filtered: boolean):
     span.title = "Seen in the browser's network timing, without method, headers or bodies";
     line.append(span);
   }
-  const size = el("span", "", formatBytes(calls.reduce((n, c) => n + (c.size ?? 0), 0)));
-  size.title = "Total response size";
-  line.append(size);
+  if (calls.length) {
+    const size = el("span", "", formatBytes(calls.reduce((n, c) => n + (c.size ?? 0), 0)));
+    size.title = "Total response size";
+    line.append(size);
+  }
+  if (log.cleared) {
+    const cleared = el("span", "", `${log.cleared} cleared`);
+    cleared.title = "Hidden by Clear. Reload the page to start over.";
+    line.append(cleared);
+  }
+  if (onClear) {
+    const clear = el("button", "call-copy summary-action", "Clear");
+    clear.type = "button";
+    clear.title = "Hide the calls so far, so only new calls show. The page isn't changed.";
+    clear.disabled = !calls.length;
+    clear.addEventListener("click", onClear);
+    line.append(clear);
+  }
   return line;
 }
 

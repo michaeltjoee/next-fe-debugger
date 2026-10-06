@@ -1,5 +1,6 @@
 import {
   clearDataLayer,
+  clearGateway,
   dataLayerStamp,
   gatewayStamp,
   readNextData,
@@ -84,8 +85,10 @@ function render(): void {
   renderBody(out, current, active, { filter: filter.value, raw, onClear });
 }
 
+/** Clear on the API Fetch or dataLayer tab, whichever is showing. */
 async function onClear(): Promise<void> {
-  await evalInPage(`(${clearDataLayer.toString()})()`).catch(() => {});
+  const clear = active === "gateway" ? clearGateway : clearDataLayer;
+  await evalInPage(`(${clear.toString()})()`).catch(() => {});
   load();
 }
 
