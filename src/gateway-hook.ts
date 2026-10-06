@@ -6,6 +6,11 @@
 
   const MAX_CALLS = 300;
   const MAX_BODY_CHARS = 1_000_000;
+  // Gateway paths that poll in the background and would only crowd the list.
+  const IGNORED_PATHS = [
+    "tix-inbox/userInbox/unreadCount",
+    "tix-chat-platform/v1/users/unread_count",
+  ];
 
   const log: GatewayLog = { session: performance.timeOrigin, version: 0, calls: [] };
   // Non-enumerable, so it stays out of anything that walks window's keys.
@@ -17,7 +22,9 @@
   function gatewayUrl(raw: string | URL): string | null {
     try {
       const url = new URL(raw, location.href);
-      return url.pathname.includes("/ms-gateway/") ? url.href : null;
+      if (!url.pathname.includes("/ms-gateway/")) return null;
+      if (IGNORED_PATHS.some((p) => url.pathname.includes(p))) return null;
+      return url.href;
     } catch {
       return null;
     }
