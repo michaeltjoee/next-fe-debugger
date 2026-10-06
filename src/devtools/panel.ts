@@ -37,12 +37,6 @@ let active: SourceId = "version";
 let raw = false;
 let watchTimer: ReturnType<typeof setInterval> | undefined;
 
-createTabStrip($("tabs"), out, SOURCES, active, (id) => {
-  active = id;
-  render();
-  if (id === "gateway" || id === "datalayer") load({ quiet: true });
-});
-
 function evalInPage<T>(expr: string): Promise<T> {
   return new Promise((resolve, reject) => {
     chrome.devtools.inspectedWindow.eval<T>(expr, (result, err) => {
@@ -98,6 +92,12 @@ function toggle(item: HTMLButtonElement): boolean {
   item.setAttribute("aria-checked", String(on));
   return on;
 }
+
+createTabStrip($("tabs"), out, SOURCES, active, (id) => {
+  active = id;
+  render();
+  if (id === "gateway" || id === "datalayer") load({ quiet: true });
+});
 
 filter.addEventListener("input", render);
 
