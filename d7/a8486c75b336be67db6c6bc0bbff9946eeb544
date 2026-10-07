@@ -1,0 +1,62 @@
+src/shared/curl.ts
+  s_a92b5f8e333c61::t_a95abf5fc86896 1-34
+learn/assets/extension-map.js
+  s_14594be3997159::t_815eb1f32a6d81 21,27
+src/shared/tree.css
+  s_a92b5f8e333c61::t_d1b54a17fc9578 484
+README.md
+  s_a92b5f8e333c61::t_9f23aca26ec6f4 9
+src/devtools/panel.ts
+  s_14594be3997159::t_87e20248e610a2 40-46
+  s_14594be3997159::t_b6d5576fd72dd2 58,60-64
+  s_14594be3997159::t_2aaf24798b2646 49-50
+  s_14594be3997159::t_815eb1f32a6d81 6,59,67
+learn/lessons/0001-the-manifest-is-the-entrypoint.html
+  s_14594be3997159::t_815eb1f32a6d81 183
+learn/MISSION.md
+  s_14594be3997159::t_815eb1f32a6d81 9
+learn/NOTES.md
+  s_14594be3997159::t_815eb1f32a6d81 12
+src/popup/popup.ts
+  s_14594be3997159::t_815eb1f32a6d81 1,49
+src/shared/inspector.ts
+  s_14594be3997159::t_815eb1f32a6d81 59
+  s_a92b5f8e333c61::t_3a370eaf241163 599
+  s_a92b5f8e333c61::t_d1b54a17fc9578 4,562,566-569,595-598,600-604
+  s_a92b5f8e333c61::t_c83e21fc9c33f7 605-606
+src/background.ts
+  s_a92b5f8e333c61::t_a95abf5fc86896 37-66
+learn/reference/architecture-map.html
+  s_14594be3997159::t_815eb1f32a6d81 37,42,44,47
+src/shared/read-next-data.ts
+  s_14594be3997159::t_815eb1f32a6d81 59,213,224,230,239
+manifest.json
+  s_a92b5f8e333c61::t_a95abf5fc86896 8,11-12
+  s_a92b5f8e333c61::t_66d32be5b051dc 13
+src/global.d.ts
+  s_a92b5f8e333c61::t_a95abf5fc86896 72-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.11",
+  "base_commit_sha": "d7a8486c75b336be67db6c6bc0bbff9946eeb544",
+  "prompts": {},
+  "sessions": {
+    "s_14594be3997159": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2ca44e33-6484-4c22-8a9c-1bd70cb71f94",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "michaeltjoee <113000037+michaeltjoee@users.noreply.github.com>"
+    },
+    "s_a92b5f8e333c61": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a86fabac-b6bc-47bf-80cd-d2e751c3d1ec",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "michaeltjoee <113000037+michaeltjoee@users.noreply.github.com>"
+    }
+  }
+}
