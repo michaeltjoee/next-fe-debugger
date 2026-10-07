@@ -1,6 +1,7 @@
 // What both the panel and the popup show: the deployed version, the page's
 // ms-gateway calls, the page globals (__NEXT_DATA__ and __CORE_DATA__) together, and window.dataLayer.
 import type { AssetBundle, DataLayerResult, GatewayResult, NextDataResult } from "./read-next-data.js";
+import { curlCommand } from "./curl.js";
 import { emptyNote, flash, renderTree } from "./json-tree.js";
 
 export type SourceId = "version" | "gateway" | "page" | "datalayer";
@@ -55,7 +56,7 @@ export function hasToolbar(id: SourceId): boolean {
   return id !== "version";
 }
 
-/** Page expression that logs the active tab; __NEXT_DATA__ falls back to the script tag like readNextData does. */
+/** Page expression that logs the active tab; __NEXT_DATA__ falls back to the script tag like readPage does. */
 export function logExpression(result: NextDataResult, id: SourceId): string {
   if (id === "version") return `console.log("Assets", ${JSON.stringify(valueOf(result, id))})`;
   if (id === "gateway") {
@@ -558,11 +559,14 @@ function callBody(call: GatewayCall, needle: string, raw: boolean): HTMLElement 
   const head = el("div", "call-part-head");
   head.append(el("span", "call-part-name", "Response"));
   if (call.duration == null) {
-    head.append(el("span", "quiet", "Waiting for the response…"));
+    head.append(el("span", "quiet", "Waiting for the response…"), curlButton(call));
     response.append(head);
   } else {
     const type = call.responseHeaders?.["content-type"]?.split(";")[0];
-    head.append(el("span", "quiet", [type, call.size != null ? formatBytes(call.size) : ""].filter(Boolean).join(", ")));
+    head.append(
+      el("span", "quiet", [type, call.size != null ? formatBytes(call.size) : ""].filter(Boolean).join(", ")),
+      curlButton(call),
+    );
     if (call.response != null) {
       const copy = el("button", "call-copy", "Copy");
       copy.type = "button";
@@ -586,6 +590,18 @@ function callBody(call: GatewayCall, needle: string, raw: boolean): HTMLElement 
   body.append(callSection("Request", request, needle, raw, 2));
   if (call.responseHeaders) body.append(callSection("Response headers", call.responseHeaders, needle, raw, 1));
   return body;
+}
+
+function curlButton(call: GatewayCall): HTMLButtonElement {
+  const button = el("button", "call-copy", "Copy as cURL");
+  button.type = "button";
+  button.title =
+    "Copy the request as a cURL command: the headers the page set, and only the session_access_token, device_id, userlang, tiket_currency, country_code and cf_clearance cookies";
+  button.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(await curlCommand(call));
+    flash(button);
+  });
+  return button;
 }
 
 /** A closed section under the response; filtering opens it when the match is inside. */

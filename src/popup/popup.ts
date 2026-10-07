@@ -1,4 +1,4 @@
-import { clearDataLayer, clearGateway, readNextData, type NextDataResult } from "../shared/read-next-data.js";
+import { clearDataLayer, clearGateway, readPage, type NextDataResult } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
 import {
   SOURCES,
@@ -46,7 +46,7 @@ async function load(): Promise<void> {
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId },
       world: "MAIN",
-      func: readNextData,
+      func: readPage,
     });
     const result = injection?.result;
     if (!result) throw new Error("the page returned nothing");

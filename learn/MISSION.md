@@ -6,7 +6,7 @@ I have a working Chrome extension (`next-fe debugger`) that inspects Next.js pag
 ## Success looks like
 - Point at any file in `src/` and say who starts it, when, and what it can see (the page? the DOM? Chrome APIs?).
 - Trace each feature end to end from a user action to pixels: badge, keyboard shortcuts, Version, API Fetch, Page Data, dataLayer, live updates.
-- Explain why the non-obvious rules exist (e.g. `readNextData` must be self-contained, content scripts can't import, `gateway-hook` runs in the MAIN world at `document_start`).
+- Explain why the non-obvious rules exist (e.g. `readPage` must be self-contained, content scripts can't import, `gateway-hook` runs in the MAIN world at `document_start`).
 - Add a small feature or fix a bug in the extension without guessing.
 
 ## Constraints

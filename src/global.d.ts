@@ -69,3 +69,9 @@ interface NextDataDetectedMessage {
   found: boolean;
   page?: string;
 }
+
+/** Asks the background for the cookies "Copy as cURL" keeps for `url`; answered with a Cookie header value, "" when none. */
+interface CurlCookiesMessage {
+  type: "curl-cookies";
+  url: string;
+}

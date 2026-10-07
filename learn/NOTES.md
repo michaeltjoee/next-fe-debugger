@@ -9,7 +9,7 @@
 
 ## Planned path (revise as learning records come in)
 1. **The manifest is the entrypoint**: five entrypoints, four worlds; trace the badge. ← lesson 0001
-2. **Reaching into the page**: `readNextData.toString()` → `inspectedWindow.eval` (panel) vs `scripting.executeScript({ func, world: "MAIN" })` (popup); why it must be self-contained; `NextDataResult` as the contract.
+2. **Reaching into the page**: `readPage.toString()` → `inspectedWindow.eval` (panel) vs `scripting.executeScript({ func, world: "MAIN" })` (popup); why it must be self-contained; `NextDataResult` as the contract.
 3. **Keyboard shortcuts**: `commands` → background `setPopup(?tab=)` → `openPopup` → popup reads `?tab`; second listener when already open.
 4. **API Fetch, part 1**: monkey-patching `fetch` / XHR at `document_start` into `window.__MS_GATEWAY__`.
 5. **API Fetch, part 2**: merging with resource timing (unrecorded calls), ignored paths, stamps + 1s polling.

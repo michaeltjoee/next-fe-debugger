@@ -18,13 +18,13 @@
       ["title", "popup/popup.js"],
       ["desc", "extension page · toolbar icon or shortcut"],
       ["key", "manifest: action.default_popup"],
-      ["call", "→ scripting.executeScript(readNextData)"],
+      ["call", "→ scripting.executeScript(readPage)"],
     ] },
     panel: { x: 26, y: 340, w: 298, h: 100, side: "ext", lines: [
       ["title", "devtools.js → panel.js"],
       ["desc", "extension page inside DevTools"],
       ["key", "manifest: devtools_page"],
-      ["call", "→ inspectedWindow.eval(readNextData)"],
+      ["call", "→ inspectedWindow.eval(readPage)"],
     ] },
     content: { x: 436, y: 124, w: 298, h: 100, side: "page", lines: [
       ["title", "content.js"],

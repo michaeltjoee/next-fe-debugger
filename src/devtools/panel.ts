@@ -3,7 +3,7 @@ import {
   clearGateway,
   dataLayerStamp,
   gatewayStamp,
-  readNextData,
+  readPage,
   type NextDataResult,
 } from "../shared/read-next-data.js";
 import { emptyNote } from "../shared/json-tree.js";
@@ -37,8 +37,17 @@ let active: SourceId = "version";
 let raw = false;
 let watchTimer: ReturnType<typeof setInterval> | undefined;
 
+/**
+ * Runs `expr` in the inspected page, as if typed into its Console, and resolves with the result.
+ * The panel has its own window, so this is how it reaches the page's globals.
+ * Only the string crosses over, so functions sent as `(${fn.toString()})()` must be self-contained,
+ * and the result comes back as JSON (DOM nodes and functions are lost).
+ * Rejects with what the code threw, or why the eval couldn't run.
+ */
 function evalInPage<T>(expr: string): Promise<T> {
   return new Promise((resolve, reject) => {
+    // Chrome's handle on the tab this DevTools window is attached to. It only exists in
+    // DevTools pages (this panel), which is why the popup uses chrome.scripting instead.
     chrome.devtools.inspectedWindow.eval<T>(expr, (result, err) => {
       if (err) reject(err.value ?? err.description ?? err);
       else resolve(result as T);
@@ -46,9 +55,16 @@ function evalInPage<T>(expr: string): Promise<T> {
   });
 }
 
+/**
+ * Reads everything the tabs show from the page (readPage runs there) and renders it.
+ * `quiet` is for background re-reads (Watch, the stamp poller, switching tabs): it skips the
+ * render when nothing changed. The fingerprint uses the gateway and dataLayer stamps, which
+ * move whenever a call or push does, instead of stringifying every body.
+ * If the page can't be read, says why and drops `current`, which also stops the stamp poller.
+ */
 async function load({ quiet = false } = {}): Promise<void> {
   try {
-    const result = await evalInPage<NextDataResult>(`(${readNextData.toString()})()`);
+    const result = await evalInPage<NextDataResult>(`(${readPage.toString()})()`);
     const json = JSON.stringify([
       result.data,
       result.core,

@@ -56,7 +56,7 @@ export interface NextDataResult {
 
 // Executed in the page's MAIN world (via inspectedWindow.eval or scripting.executeScript).
 // Must be self-contained: it is serialized with Function.prototype.toString.
-export function readNextData(): NextDataResult {
+export function readPage(): NextDataResult {
   const live = window.__NEXT_DATA__;
   const el = document.getElementById("__NEXT_DATA__");
   let fromScriptTag: NextData | null = null;
@@ -210,7 +210,7 @@ export function readNextData(): NextDataResult {
   }
 }
 
-/** The Gateway stamp alone, for cheap polling. Same counts as readGateway; self-contained like readNextData. */
+/** The Gateway stamp alone, for cheap polling. Same counts as readGateway; self-contained like readPage. */
 export function gatewayStamp(): string {
   const timed = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter(
     (e) => e.name.includes("/ms-gateway/") && (e.initiatorType === "fetch" || e.initiatorType === "xmlhttprequest"),
@@ -221,13 +221,13 @@ export function gatewayStamp(): string {
 /**
  * The API Fetch tab's Clear: hides the calls so far by marking when the tab starts.
  * Calls are left as they are, in the hook's log and the browser's timing; a page reload shows only new ones anyway.
- * Self-contained like readNextData.
+ * Self-contained like readPage.
  */
 export function clearGateway(): void {
   Object.defineProperty(window, "__MS_GATEWAY_CLEARED_AT__", { value: performance.now(), writable: true, configurable: true });
 }
 
-/** The dataLayer stamp alone, for cheap polling. Same as readDataLayer's; self-contained like readNextData. */
+/** The dataLayer stamp alone, for cheap polling. Same as readDataLayer's; self-contained like readPage. */
 export function dataLayerStamp(): string {
   const list = window.dataLayer;
   return Array.isArray(list) ? `${list.length}:${Math.min(list.__clearedAt ?? 0, list.length)}` : "";
@@ -236,7 +236,7 @@ export function dataLayerStamp(): string {
 /**
  * The dataLayer tab's Clear: hides the entries so far by marking where the tab starts.
  * The page's dataLayer is left as is, so GTM and the page's own code never notice.
- * Self-contained like readNextData.
+ * Self-contained like readPage.
  */
 export function clearDataLayer(): void {
   const list = window.dataLayer;

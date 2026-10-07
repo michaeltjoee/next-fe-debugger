@@ -34,17 +34,17 @@
   <h2>The one pipeline every tab goes through</h2>
 <pre><code>page (MAIN world)                         extension page (popup or panel)
 ───────────────────                       ──────────────────────────────────────────────
-readNextData()  ── runs in page ──►  NextDataResult (plain JSON)
+readPage()  ── runs in page ──►  NextDataResult (plain JSON)
   src/shared/read-next-data.ts            │
   serialized with .toString()             ▼
                                      renderBody(out, result, activeTab, {filter, raw})
   panel: inspectedWindow.eval(             src/shared/inspector.ts
-    `(${readNextData.toString()})()`)      ├─ version   → renderVersion
+    `(${readPage.toString()})()`)      ├─ version   → renderVersion
   popup: scripting.executeScript({         ├─ gateway   → renderGateway    ┐
-    func: readNextData, world: "MAIN"})    ├─ page      → renderPageData   ├→ renderTree (json-tree.ts)
+    func: readPage, world: "MAIN"})    ├─ page      → renderPageData   ├→ renderTree (json-tree.ts)
                                            └─ datalayer → renderDataLayer  ┘</code></pre>
   <p>
-    <strong>Rule:</strong> <code>readNextData</code>, <code>gatewayStamp</code>, <code>dataLayerStamp</code> and <code>clearDataLayer</code> are sent to the page as source text, so they can't use imports or anything outside their own body. Their result must be JSON (hence the <code>JSON.parse(JSON.stringify(…))</code> round trips).
+    <strong>Rule:</strong> <code>readPage</code>, <code>gatewayStamp</code>, <code>dataLayerStamp</code> and <code>clearDataLayer</code> are sent to the page as source text, so they can't use imports or anything outside their own body. Their result must be JSON (hence the <code>JSON.parse(JSON.stringify(…))</code> round trips).
   </p>
 
   <h2>Features, one card each</h2>

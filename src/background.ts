@@ -34,3 +34,33 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     chrome.action.setPopup({ tabId, popup: POPUP });
   }
 });
+
+// "Copy as cURL" on the API Fetch tab gets its cookies here: chrome.cookies sees the HttpOnly ones
+// (the session tokens, cf_clearance) that page code can't. Only these are kept, so a pasted
+// command carries the session, device and locale without every tracking cookie on the domain.
+const CURL_COOKIES = [
+  "session_access_token",
+  "device_id",
+  "userlang",
+  "tiket_currency",
+  "country_code",
+  "cf_clearance",
+];
+
+chrome.runtime.onMessage.addListener(
+  (msg: CurlCookiesMessage | undefined, sender: chrome.runtime.MessageSender, sendResponse: (cookie: string) => void) => {
+    // Only the extension's own pages (popup, DevTools panel), never a content script.
+    if (msg?.type !== "curl-cookies" || !sender.url?.startsWith(chrome.runtime.getURL(""))) return;
+    chrome.cookies.getAll({ url: msg.url }).then(
+      (cookies) =>
+        sendResponse(
+          cookies
+            .filter((c) => CURL_COOKIES.includes(c.name))
+            .map((c) => `${c.name}=${c.value}`)
+            .join("; "),
+        ),
+      () => sendResponse(""),
+    );
+    return true;
+  },
+);

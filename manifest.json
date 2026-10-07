@@ -5,7 +5,11 @@
   "description": "Inspect window.__NEXT_DATA__ on Next.js (Pages Router) sites.",
   "permissions": [
     "activeTab",
+    "cookies",
     "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "dist/background.js"
